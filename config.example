@@ -1,0 +1,41 @@
+# AI Voice Agent POC - Environment Configuration
+# Create a .env file in the root directory with these variables
+
+# Server Configuration
+PORT=3000
+NODE_ENV=development
+
+# Twilio Configuration
+# Get these from your Twilio Console: https://console.twilio.com/
+TWILIO_ACCOUNT_SID=your_twilio_account_sid_here
+TWILIO_AUTH_TOKEN=your_twilio_auth_token_here
+TWILIO_PHONE_NUMBER=your_twilio_phone_number_here
+
+# HumeAI EVI Configuration (for HumeAI + LiveKit integration)
+# Get these from your HumeAI dashboard: https://platform.hume.ai/settings/keys
+HUME_API_KEY=your_hume_api_key_here
+# Custom EVI configuration ID for specialized voice agent behavior
+# This configuration provides customized voice, system prompt, and capabilities
+# Configuration ID: 9d00fd96-7e92-44c1-b781-4af52331c629
+HUME_CONFIG_ID=9d00fd96-7e92-44c1-b781-4af52331c629
+
+# LiveKit Cloud Configuration (for WebRTC rooms and SIP integration)
+# Get these from your LiveKit Cloud dashboard: https://cloud.livekit.io/settings/keys
+LIVEKIT_API_KEY=your_livekit_api_key_here
+LIVEKIT_API_SECRET=your_livekit_api_secret_here
+LIVEKIT_WS_URL=wss://your-project.livekit.cloud
+
+# Optional: OpenAI Configuration (for conversation logic)
+# OPENAI_API_KEY=your_openai_api_key_here
+
+# Optional: Speech-to-Text Service
+# SPEECH_TO_TEXT_API_KEY=your_stt_api_key_here
+
+# Webhook Configuration (for production)
+# WEBHOOK_BASE_URL=https://your-domain.com
+
+# Setup Instructions:
+# 1. Copy these variables to a new .env file
+# 2. Replace placeholder values with your actual API keys (keep the HUME_CONFIG_ID as shown)
+# 3. Save the .env file in the root directory
+# 4. Restart the server to load the new environment variables 

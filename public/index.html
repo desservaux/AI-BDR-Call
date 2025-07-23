@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Voice Agent POC</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .status-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .status-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .status-label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .status-value {
+            font-weight: 500;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+        
+        .status-connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-unknown {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .call-section {
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1.1em;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            margin-top: 10px;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .call-status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .call-status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .call-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .call-status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .stats-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI Voice Agent</h1>
+            <p>Proof of Concept Dashboard</p>
+        </div>
+        
+        <div class="status-section">
+            <h3 style="margin-bottom: 15px; color: #333;">System Status</h3>
+            <div class="status-item">
+                <span class="status-label">Server</span>
+                <span class="status-value status-unknown" id="server-status">Checking...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Twilio</span>
+                <span class="status-value status-unknown" id="twilio-status">Checking...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">HumeAI EVI</span>
+                <span class="status-value status-unknown" id="hume-evi-status">Checking...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">LiveKit</span>
+                <span class="status-value status-unknown" id="livekit-status">Checking...</span>
+            </div>
+        </div>
+        
+        <div class="call-section">
+            <h3 style="margin-bottom: 20px; color: #333;">Make AI Voice Call</h3>
+            <form id="call-form">
+                <div class="form-group">
+                    <label for="phone-number">Phone Number</label>
+                    <input 
+                        type="tel" 
+                        id="phone-number" 
+                        name="phoneNumber" 
+                        placeholder="+1234567890" 
+                        required
+                        pattern="^\+[1-9]\d{1,14}$"
+                        title="Please enter a valid international phone number (e.g., +1234567890)"
+                    >
+                    <small style="color: #666; font-size: 0.9em;">Enter in international format (e.g., +1234567890)</small>
+                </div>
+                <button type="submit" class="btn btn-primary" id="call-btn">
+                    📞 Start AI Call
+                </button>
+                <button type="button" class="btn btn-secondary" id="refresh-btn">
+                    🔄 Refresh Status
+                </button>
+            </form>
+            
+            <div class="call-status" id="call-status">
+                <div id="call-message"></div>
+            </div>
+        </div>
+        
+        <div class="stats-section">
+            <h3 style="margin-bottom: 15px; color: #333;">Live Statistics</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number" id="active-calls">0</div>
+                    <div class="stat-label">Active Calls</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="ai-conversations">0</div>
+                    <div class="stat-label">AI Conversations</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="play-streams">0</div>
+                    <div class="stat-label">Play.ht Streams</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API base URL
+        const API_BASE = '';
+        
+        // DOM elements
+        const serverStatus = document.getElementById('server-status');
+        const twilioStatus = document.getElementById('twilio-status');
+        const humeEviStatus = document.getElementById('hume-evi-status');
+        const liveKitStatus = document.getElementById('livekit-status');
+        const callForm = document.getElementById('call-form');
+        const callBtn = document.getElementById('call-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const callStatus = document.getElementById('call-status');
+        const callMessage = document.getElementById('call-message');
+        const activeCalls = document.getElementById('active-calls');
+        const aiConversations = document.getElementById('ai-conversations');
+        const playStreams = document.getElementById('play-streams');
+        
+        // Update status indicator
+        function updateStatus(element, success, message) {
+            element.textContent = message;
+            element.className = 'status-value ' + (success ? 'status-connected' : 'status-disconnected');
+        }
+        
+        // Show call status message
+        function showCallStatus(type, message) {
+            callStatus.className = `call-status ${type}`;
+            callMessage.textContent = message;
+            callStatus.style.display = 'block';
+        }
+        
+        // Hide call status message
+        function hideCallStatus() {
+            callStatus.style.display = 'none';
+        }
+        
+        // Check system status
+        async function checkStatus() {
+            try {
+                // Check server health
+                const healthResponse = await fetch(`${API_BASE}/health`);
+                const health = await healthResponse.json();
+                updateStatus(serverStatus, health.status === 'ok', health.status === 'ok' ? 'Connected' : 'Error');
+                
+                // Check Twilio
+                const twilioResponse = await fetch(`${API_BASE}/test-twilio`);
+                const twilio = await twilioResponse.json();
+                updateStatus(twilioStatus, twilio.success, twilio.success ? 'Connected' : 'Disconnected');
+                
+                // Check HumeAI EVI
+                const humeEviResponse = await fetch(`${API_BASE}/test-hume-evi`);
+                const humeEvi = await humeEviResponse.json();
+                updateStatus(humeEviStatus, humeEvi.success, humeEvi.success ? 'Connected' : 'Disconnected');
+                
+                // Check LiveKit
+                const liveKitResponse = await fetch(`${API_BASE}/test-livekit`);
+                const liveKit = await liveKitResponse.json();
+                updateStatus(liveKitStatus, liveKit.success, liveKit.success ? 'Connected' : 'Disconnected');
+                
+                // Update call button state
+                const systemReady = health.status === 'ok' && twilio.success && humeEvi.success && liveKit.success;
+                callBtn.disabled = !systemReady;
+                
+                if (!systemReady) {
+                    callBtn.textContent = '⚠️ System Not Ready';
+                } else {
+                    callBtn.textContent = '📞 Start AI Call';
+                }
+                
+            } catch (error) {
+                console.error('Error checking status:', error);
+                updateStatus(serverStatus, false, 'Error');
+                updateStatus(twilioStatus, false, 'Error');
+                updateStatus(humeEviStatus, false, 'Error');
+                updateStatus(liveKitStatus, false, 'Error');
+                callBtn.disabled = true;
+                callBtn.textContent = '❌ Connection Error';
+            }
+        }
+        
+        // Update statistics
+        async function updateStats() {
+            try {
+                const [callsResponse, aiResponse, humeResponse, liveKitResponse] = await Promise.all([
+                    fetch(`${API_BASE}/calls/stats`),
+                    fetch(`${API_BASE}/ai/stats`),
+                    fetch(`${API_BASE}/hume-evi/stats`),
+                    fetch(`${API_BASE}/livekit/stats`)
+                ]);
+                
+                const calls = await callsResponse.json();
+                const ai = await aiResponse.json();
+                const hume = await humeResponse.json();
+                const liveKit = await liveKitResponse.json();
+                
+                activeCalls.textContent = calls.totalActiveCalls || 0;
+                aiConversations.textContent = ai.totalActiveConversations || 0;
+                playStreams.textContent = `${hume.stats?.activeConversations || 0} HumeAI / ${liveKit.stats?.activeRooms || 0} LiveKit`;
+                
+            } catch (error) {
+                console.error('Error updating stats:', error);
+            }
+        }
+        
+        // Handle form submission
+        callForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const phoneNumber = document.getElementById('phone-number').value.trim();
+            
+            if (!phoneNumber) {
+                showCallStatus('error', 'Please enter a phone number');
+                return;
+            }
+            
+            // Validate phone number format
+            const phoneRegex = /^\+[1-9]\d{1,14}$/;
+            if (!phoneRegex.test(phoneNumber)) {
+                showCallStatus('error', 'Please enter a valid international phone number (e.g., +1234567890)');
+                return;
+            }
+            
+            callBtn.disabled = true;
+            callBtn.textContent = '📞 Initiating Call...';
+            showCallStatus('info', 'Initiating AI voice call...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/make-call`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ phoneNumber: phoneNumber })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showCallStatus('success', `Call initiated successfully! Call SID: ${result.callSid}`);
+                    document.getElementById('phone-number').value = '';
+                } else {
+                    showCallStatus('error', `Call failed: ${result.message}`);
+                }
+                
+            } catch (error) {
+                console.error('Error making call:', error);
+                showCallStatus('error', 'Failed to initiate call. Please try again.');
+            } finally {
+                setTimeout(() => {
+                    callBtn.disabled = false;
+                    callBtn.textContent = '📞 Start AI Call';
+                    checkStatus(); // Refresh status after call attempt
+                }, 3000);
+            }
+        });
+        
+        // Handle refresh button
+        refreshBtn.addEventListener('click', () => {
+            hideCallStatus();
+            checkStatus();
+            updateStats();
+        });
+        
+        // Initial status check
+        checkStatus();
+        updateStats();
+        
+        // Auto-refresh stats every 5 seconds
+        setInterval(updateStats, 5000);
+        
+        // Auto-refresh status every 30 seconds
+        setInterval(checkStatus, 30000);
+    </script>
+</body>
+</html> 

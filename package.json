@@ -1,15 +1,38 @@
 {
-  "name": "nodejs",
+  "name": "ai-voice-agent-poc",
   "version": "1.0.0",
-  "description": "",
+  "description": "AI Voice Agent POC with Play.ht and Twilio integration",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "ai",
+    "voice",
+    "twilio",
+    "play.ht",
+    "poc"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/node": "^22.13.11"
+    "@types/node": "^22.13.11",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-ws": "^5.0.2",
+    "livekit-client": "^2.15.3",
+    "livekit-server-sdk": "^2.13.1",
+    "node-fetch": "^3.3.2",
+    "twilio": "^4.19.0",
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "twilio-cli": "^6.0.3"
   }
 }
