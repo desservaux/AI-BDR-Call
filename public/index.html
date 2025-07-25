@@ -264,10 +264,7 @@
                 <span class="status-label">HumeAI EVI</span>
                 <span class="status-value status-unknown" id="hume-evi-status">Checking...</span>
             </div>
-            <div class="status-item">
-                <span class="status-label">LiveKit</span>
-                <span class="status-value status-unknown" id="livekit-status">Checking...</span>
-            </div>
+
         </div>
         
         <div class="call-section">
@@ -312,7 +309,7 @@
                 </div>
                 <div class="stat-item">
                     <div class="stat-number" id="play-streams">0</div>
-                    <div class="stat-label">Play.ht Streams</div>
+                    <div class="stat-label">HumeAI Status</div>
                 </div>
             </div>
         </div>
@@ -322,11 +319,14 @@
         // API base URL
         const API_BASE = '';
         
+        // Submission tracking
+        let isSubmitting = false;
+        
         // DOM elements
         const serverStatus = document.getElementById('server-status');
         const twilioStatus = document.getElementById('twilio-status');
         const humeEviStatus = document.getElementById('hume-evi-status');
-        const liveKitStatus = document.getElementById('livekit-status');
+        // const liveKitStatus = document.getElementById('livekit-status'); // Removed for direct integration
         const callForm = document.getElementById('call-form');
         const callBtn = document.getElementById('call-btn');
         const refreshBtn = document.getElementById('refresh-btn');
@@ -367,18 +367,13 @@
                 const twilio = await twilioResponse.json();
                 updateStatus(twilioStatus, twilio.success, twilio.success ? 'Connected' : 'Disconnected');
                 
-                // Check HumeAI EVI
-                const humeEviResponse = await fetch(`${API_BASE}/test-hume-evi`);
+                // Check HumeAI EVI (skip actual connection for routine checks to avoid creating agent sessions)
+                const humeEviResponse = await fetch(`${API_BASE}/test-hume-evi?skipConnection=true`);
                 const humeEvi = await humeEviResponse.json();
                 updateStatus(humeEviStatus, humeEvi.success, humeEvi.success ? 'Connected' : 'Disconnected');
                 
-                // Check LiveKit
-                const liveKitResponse = await fetch(`${API_BASE}/test-livekit`);
-                const liveKit = await liveKitResponse.json();
-                updateStatus(liveKitStatus, liveKit.success, liveKit.success ? 'Connected' : 'Disconnected');
-                
-                // Update call button state
-                const systemReady = health.status === 'ok' && twilio.success && humeEvi.success && liveKit.success;
+                // Update call button state - only need Twilio and HumeAI for direct integration
+                const systemReady = health.status === 'ok' && twilio.success && humeEvi.success;
                 callBtn.disabled = !systemReady;
                 
                 if (!systemReady) {
@@ -392,7 +387,6 @@
                 updateStatus(serverStatus, false, 'Error');
                 updateStatus(twilioStatus, false, 'Error');
                 updateStatus(humeEviStatus, false, 'Error');
-                updateStatus(liveKitStatus, false, 'Error');
                 callBtn.disabled = true;
                 callBtn.textContent = '❌ Connection Error';
             }
@@ -401,24 +395,23 @@
         // Update statistics
         async function updateStats() {
             try {
-                const [callsResponse, aiResponse, humeResponse, liveKitResponse] = await Promise.all([
-                    fetch(`${API_BASE}/calls/stats`),
-                    fetch(`${API_BASE}/ai/stats`),
-                    fetch(`${API_BASE}/hume-evi/stats`),
-                    fetch(`${API_BASE}/livekit/stats`)
+                const [humeResponse] = await Promise.all([
+                    fetch(`${API_BASE}/hume-evi/stats`)
                 ]);
                 
-                const calls = await callsResponse.json();
-                const ai = await aiResponse.json();
                 const hume = await humeResponse.json();
-                const liveKit = await liveKitResponse.json();
                 
-                activeCalls.textContent = calls.totalActiveCalls || 0;
-                aiConversations.textContent = ai.totalActiveConversations || 0;
-                playStreams.textContent = `${hume.stats?.activeConversations || 0} HumeAI / ${liveKit.stats?.activeRooms || 0} LiveKit`;
+                // For direct Twilio-HumeAI integration, we only track HumeAI stats
+                activeCalls.textContent = hume.stats?.activeConversations || 0;
+                aiConversations.textContent = hume.stats?.totalConversations || 0;
+                playStreams.textContent = `${hume.stats?.activeConversations || 0} HumeAI Direct`;
                 
             } catch (error) {
                 console.error('Error updating stats:', error);
+                // Set default values on error
+                activeCalls.textContent = '0';
+                aiConversations.textContent = '0';
+                playStreams.textContent = 'Direct Integration';
             }
         }
         
@@ -426,10 +419,25 @@
         callForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            // Add debugging
+            const timestamp = Date.now();
+            console.log(`🆔 [${timestamp}] Form submission event triggered`);
+            
+            // Prevent multiple submissions using both button state and flag
+            if (callBtn.disabled || isSubmitting) {
+                console.log(`⚠️ [${timestamp}] Call already in progress (button: ${callBtn.disabled}, flag: ${isSubmitting}), ignoring duplicate submission`);
+                return;
+            }
+            
+            // Set submission flag
+            isSubmitting = true;
+            
             const phoneNumber = document.getElementById('phone-number').value.trim();
+            console.log(`📞 [${timestamp}] Processing call request for: ${phoneNumber}`);
             
             if (!phoneNumber) {
                 showCallStatus('error', 'Please enter a phone number');
+                isSubmitting = false;
                 return;
             }
             
@@ -437,12 +445,15 @@
             const phoneRegex = /^\+[1-9]\d{1,14}$/;
             if (!phoneRegex.test(phoneNumber)) {
                 showCallStatus('error', 'Please enter a valid international phone number (e.g., +1234567890)');
+                isSubmitting = false;
                 return;
             }
             
             callBtn.disabled = true;
             callBtn.textContent = '📞 Initiating Call...';
             showCallStatus('info', 'Initiating AI voice call...');
+            
+            console.log(`🚀 [${timestamp}] Making API request to /make-call`);
             
             try {
                 const response = await fetch(`${API_BASE}/make-call`, {
@@ -453,22 +464,33 @@
                     body: JSON.stringify({ phoneNumber: phoneNumber })
                 });
                 
+                console.log(`📡 [${timestamp}] API response received: ${response.status}`);
+                
                 const result = await response.json();
                 
                 if (result.success) {
-                    showCallStatus('success', `Call initiated successfully! Call SID: ${result.callSid}`);
+                    console.log(`✅ [${timestamp}] Call initiated successfully: ${result.callInfo.callSid}`);
+                    showCallStatus('success', `Call initiated successfully! Call SID: ${result.callInfo.callSid}`);
                     document.getElementById('phone-number').value = '';
                 } else {
-                    showCallStatus('error', `Call failed: ${result.message}`);
+                    if (response.status === 429) {
+                        console.log(`⚠️ [${timestamp}] Duplicate call blocked: ${result.message}`);
+                        showCallStatus('warning', `Call already in progress for this number. Please wait.`);
+                    } else {
+                        console.log(`❌ [${timestamp}] Call failed: ${result.message}`);
+                        showCallStatus('error', `Call failed: ${result.message}`);
+                    }
                 }
                 
             } catch (error) {
-                console.error('Error making call:', error);
+                console.error(`❌ [${timestamp}] Error making call:`, error);
                 showCallStatus('error', 'Failed to initiate call. Please try again.');
             } finally {
+                console.log(`🔄 [${timestamp}] Resetting button state in 3 seconds`);
                 setTimeout(() => {
                     callBtn.disabled = false;
                     callBtn.textContent = '📞 Start AI Call';
+                    isSubmitting = false;
                     checkStatus(); // Refresh status after call attempt
                 }, 3000);
             }

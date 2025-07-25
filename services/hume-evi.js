@@ -70,12 +70,24 @@ class HumeEVIService extends EventEmitter {
 
     /**
      * Test connection to HumeAI EVI
+     * @param {boolean} skipActualConnection - If true, just validate credentials without connecting
      */
-    async testConnection() {
-        return new Promise((resolve, reject) => {
-            try {
-                const { apiKey, configId } = this.getCredentials();
-                
+    async testConnection(skipActualConnection = false) {
+        try {
+            const { apiKey, configId } = this.getCredentials();
+            
+            // For routine status checks, just validate that we have credentials
+            if (skipActualConnection) {
+                console.log('🔍 HumeAI EVI credentials check (no connection)');
+                return { 
+                    success: true, 
+                    message: 'Credentials available',
+                    hasApiKey: !!apiKey,
+                    hasConfigId: !!configId
+                };
+            }
+            
+            return new Promise((resolve, reject) => {
                 // Build WebSocket URL with authentication
                 const params = new URLSearchParams();
                 params.append('api_key', apiKey);
@@ -84,7 +96,7 @@ class HumeEVIService extends EventEmitter {
                 }
                 
                 const wsUrl = `${this.baseUrl}?${params.toString()}`;
-                console.log('🔗 Testing HumeAI EVI connection...');
+                console.log('🔗 Testing HumeAI EVI connection (creating WebSocket)...');
                 
                 const testWs = new WebSocket(wsUrl);
                 
@@ -122,11 +134,11 @@ class HumeEVIService extends EventEmitter {
                         console.log('📨 HumeAI EVI raw message:', data.toString());
                     }
                 });
-
-            } catch (error) {
-                reject(error);
-            }
-        });
+            });
+            
+        } catch (error) {
+            return Promise.reject(error);
+        }
     }
 
     /**

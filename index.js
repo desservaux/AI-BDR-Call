@@ -9,12 +9,8 @@ dotenv.config();
 
 // Import services
 const twilioService = require('./services/twilio');
-const mediaStreamHandler = require('./services/media-stream');
-const aiConversationService = require('./services/ai-conversation');
-const PlayAIAgentService = require('./services/play-ai-agent');
-const playAIAgentService = new PlayAIAgentService();
 const humeEVIService = require('./services/hume-evi'); // HumeAI EVI integration
-const liveKitService = require('./services/livekit'); // LiveKit Cloud integration
+const latencyMonitor = require('./services/latency-monitor');
 
 const app = express();
 const expressWsInstance = expressWs(app);
@@ -28,6 +24,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Serve the main UI
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Serve the latency monitor UI
+app.get('/latency-monitor', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'latency-monitor.html'));
 });
 
 // Health check endpoint
@@ -52,23 +53,13 @@ app.get('/test-twilio', async (req, res) => {
     }
 });
 
-// Play.ai Agent connection test endpoint
-app.get('/test-play-ai-agent', async (req, res) => {
-    try {
-        const result = await playAIAgentService.testConnection();
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
 
 // HumeAI EVI connection test endpoint
 app.get('/test-hume-evi', async (req, res) => {
     try {
-        const result = await humeEVIService.testConnection();
+        // Use skipActualConnection=true for routine status checks to avoid creating agent sessions
+        const skipConnection = req.query.skipConnection === 'true';
+        const result = await humeEVIService.testConnection(skipConnection);
         res.json({
             success: true,
             message: 'HumeAI EVI connection test successful',
@@ -79,6 +70,25 @@ app.get('/test-hume-evi', async (req, res) => {
         res.status(500).json({
             success: false,
             message: `HumeAI EVI connection failed: ${error.message}`,
+            stats: humeEVIService.getStats()
+        });
+    }
+});
+
+// HumeAI EVI real connection test endpoint (creates actual WebSocket connection)
+app.get('/test-hume-evi-real', async (req, res) => {
+    try {
+        const result = await humeEVIService.testConnection(false); // Force real connection
+        res.json({
+            success: true,
+            message: 'HumeAI EVI real connection test successful',
+            data: result,
+            stats: humeEVIService.getStats()
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: `HumeAI EVI real connection failed: ${error.message}`,
             stats: humeEVIService.getStats()
         });
     }
@@ -307,10 +317,13 @@ app.get('/livekit/sip/outbound-trunks', async (req, res) => {
     }
 });
 
-// Make outbound call endpoint - Call any phone number with HumeAI agent
+// Track recent calls to prevent duplicates
+const recentCalls = new Map();
+
+// 🚀 OFFICIAL CALL ENDPOINT - Ultra-Low Latency Optimized
 app.post('/make-call', async (req, res) => {
     try {
-        const { phoneNumber, roomName, message } = req.body;
+        const { phoneNumber, message } = req.body;
         
         if (!phoneNumber) {
             return res.status(400).json({
@@ -319,38 +332,25 @@ app.post('/make-call', async (req, res) => {
             });
         }
 
-        console.log(`📞 Making outbound call to ${phoneNumber} with HumeAI agent`);
+        console.log(`🚀 Making ultra-low latency call to ${phoneNumber}`);
 
-        // Create unique room for this call
-        const callRoomName = roomName || `outbound-call-${Date.now()}`;
-        
-        // Create room first
-        await liveKitService.createRoom(callRoomName, {
-            emptyTimeout: 300, // 5 minutes
-            maxParticipants: 2   // Caller + Agent
-        });
-
-        // Make the outbound call through LiveKit SIP
-        const result = await liveKitService.makeOutboundCall(phoneNumber, {
-            roomName: callRoomName,
-            fromNumber: '+447846855904', // Your Twilio number
-            message: message || 'Hello, this is an AI assistant calling.',
-            agentName: 'hume-ai-agent'
+        // Use the official Twilio service with ultra-low latency optimizations
+        const result = await twilioService.makeCall(phoneNumber, {
+            message: message || 'Hello, this is an ultra-low latency AI assistant calling.'
         });
 
         res.json({
             success: true,
-            message: 'Outbound call initiated successfully',
+            message: 'Ultra-low latency outbound call initiated',
             callInfo: result,
-            roomName: callRoomName,
-            phoneNumber: phoneNumber,
-            fromNumber: '+447846855904',
-            instructions: 'The HumeAI agent will join the room and handle the conversation',
-            status: 'calling'
+            performance: result.performance,
+            instructions: 'Call uses maximum performance optimization for minimal latency',
+            status: 'calling',
+            optimization: 'ultra-low-latency'
         });
 
     } catch (error) {
-        console.error('❌ Outbound call failed:', error.message);
+        console.error('❌ Call failed:', error.message);
         res.status(500).json({
             success: false,
             message: error.message
@@ -386,83 +386,89 @@ app.post('/hangup-call/:callSid', async (req, res) => {
     }
 });
 
-// WebSocket endpoint for media streaming
-app.ws('/media-stream', (ws, req) => {
-    console.log('📞 New WebSocket connection from Twilio Media Stream');
-    mediaStreamHandler.handleConnection(ws, req);
-});
+// 📊 LATENCY MONITORING ENDPOINTS
 
-// Get active calls statistics
-app.get('/calls/stats', (req, res) => {
+// Get latency statistics
+app.get('/latency/stats', async (req, res) => {
     try {
-        const stats = mediaStreamHandler.getActiveCallsStats();
-        res.json(stats);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// Get AI conversation statistics
-app.get('/ai/stats', (req, res) => {
-    try {
-        const stats = aiConversationService.getConversationStats();
-        res.json(stats);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// Get Play.ai Agent statistics
-app.get('/play-ai-agent/stats', (req, res) => {
-    try {
-        const stats = playAIAgentService.getStats();
-        res.json(stats);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// Get conversation history
-app.get('/ai/conversation/:conversationId/history', (req, res) => {
-    try {
-        const { conversationId } = req.params;
-        const history = aiConversationService.getConversationHistory(conversationId);
-        res.json({
-            conversationId: conversationId,
-            history: history
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// Manual conversation input (for testing)
-app.post('/ai/conversation/:conversationId/input', async (req, res) => {
-    try {
-        const { conversationId } = req.params;
-        const { text } = req.body;
+        const stats = latencyMonitor.getStats();
+        const performanceStats = twilioService.getPerformanceStats();
         
-        if (!text) {
-            return res.status(400).json({
+        res.json({
+            success: true,
+            latencyStats: stats,
+            performanceStats: performanceStats,
+            recommendations: latencyMonitor.analyzeBottlenecks().recommendations
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Get session details
+app.get('/latency/session/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const session = latencyMonitor.getSession(sessionId);
+        
+        if (!session) {
+            return res.status(404).json({
                 success: false,
-                message: 'Text is required'
+                message: 'Session not found'
             });
         }
 
-        await aiConversationService.processUserInput(conversationId, text);
-        res.json({ success: true, message: 'Input processed' });
+        res.json({
+            success: true,
+            session: session
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Analyze bottlenecks
+app.get('/latency/bottlenecks', async (req, res) => {
+    try {
+        const analysis = latencyMonitor.analyzeBottlenecks();
+        
+        res.json({
+            success: true,
+            analysis: analysis
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Update performance configuration
+app.post('/latency/config', async (req, res) => {
+    try {
+        const { config } = req.body;
+        
+        if (!config) {
+            return res.status(400).json({
+                success: false,
+                message: 'Configuration is required'
+            });
+        }
+
+        twilioService.updatePerformanceConfig(config);
+        
+        res.json({
+            success: true,
+            message: 'Performance configuration updated',
+            newConfig: twilioService.getPerformanceStats().performanceConfig
+        });
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -482,28 +488,14 @@ async function initializeServices() {
     try {
         console.log('🔧 Initializing services...');
         
-        // Initialize Twilio service
+        // Initialize Twilio service (now includes ultra-low latency optimizations)
         await twilioService.initialize();
-        
-        // Initialize Play.ai Agent service
-        try {
-            await playAIAgentService.initialize();
-        } catch (error) {
-            console.error('❌ Play.ai Agent service failed to initialize:', error.message);
-        }
         
         // Initialize HumeAI EVI service
         try {
             await humeEVIService.initialize();
         } catch (error) {
             console.error('❌ HumeAI EVI service failed to initialize:', error.message);
-        }
-        
-        // Initialize LiveKit service
-        try {
-            await liveKitService.initialize();
-        } catch (error) {
-            console.error('❌ LiveKit service failed to initialize:', error.message);
         }
         
         console.log('✅ All services initialized successfully');
