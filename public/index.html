@@ -50,6 +50,93 @@
             font-size: 1.1em;
         }
         
+        .tabbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 1000;
+            padding: 0 20px;
+        }
+
+        .tabbar-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 70px;
+        }
+
+        .tabbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #2c3e50;
+            text-decoration: none;
+        }
+
+        .tabbar-nav {
+            display: flex;
+            gap: 5px;
+        }
+
+        .tabbar-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            color: #7f8c8d;
+            background: transparent;
+        }
+
+        .tabbar-link:hover {
+            color: #2c3e50;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .tabbar-link.active {
+            color: #667eea;
+            background: rgba(102, 126, 234, 0.15);
+        }
+
+        .tabbar-link .icon {
+            font-size: 1.1rem;
+        }
+
+        .main-content {
+            margin-top: 90px;
+        }
+
+        @media (max-width: 768px) {
+            .tabbar-container {
+                padding: 0 15px;
+            }
+            
+            .tabbar-brand {
+                font-size: 1rem;
+            }
+            
+            .tabbar-link {
+                padding: 10px 15px;
+                font-size: 0.8rem;
+            }
+            
+            .tabbar-link .icon {
+                font-size: 1rem;
+            }
+        }
+        
         .status-section {
             background: #f8f9fa;
             border-radius: 10px;
@@ -244,6 +331,31 @@
     </style>
 </head>
 <body>
+    <!-- Tabbar -->
+    <nav class="tabbar">
+        <div class="tabbar-container">
+            <a href="/" class="tabbar-brand">
+                <span class="icon">🤖</span>
+                AI Voice Agent
+            </a>
+            <div class="tabbar-nav">
+                <a href="/" class="tabbar-link active">
+                    <span class="icon">🏠</span>
+                    Dashboard
+                </a>
+                <a href="/latency-monitor" class="tabbar-link">
+                    <span class="icon">📊</span>
+                    Latency Monitor
+                </a>
+                <a href="/call-dashboard" class="tabbar-link">
+                    <span class="icon">📞</span>
+                    Call Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-content">
     <div class="container">
         <div class="header">
             <h1>🤖 AI Voice Agent</h1>
@@ -311,6 +423,7 @@
                     <div class="stat-number" id="play-streams">0</div>
                     <div class="stat-label">HumeAI Status</div>
                 </div>
+                </div>
             </div>
         </div>
     </div>
@@ -321,6 +434,7 @@
         
         // Submission tracking
         let isSubmitting = false;
+        let lastSubmissionTime = 0;
         
         // DOM elements
         const serverStatus = document.getElementById('server-status');
@@ -354,6 +468,19 @@
             callStatus.style.display = 'none';
         }
         
+        // Set active tab based on current page
+        function setActiveTab() {
+            const currentPath = window.location.pathname;
+            const tabLinks = document.querySelectorAll('.tabbar-link');
+            
+            tabLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
+        }
+        
         // Check system status
         async function checkStatus() {
             try {
@@ -362,10 +489,18 @@
                 const health = await healthResponse.json();
                 updateStatus(serverStatus, health.status === 'ok', health.status === 'ok' ? 'Connected' : 'Error');
                 
-                // Check Twilio
-                const twilioResponse = await fetch(`${API_BASE}/test-twilio`);
+                // Check Twilio (both original and enhanced services)
+                const [twilioResponse, enhancedTwilioResponse] = await Promise.all([
+                    fetch(`${API_BASE}/test-twilio`),
+                    fetch(`${API_BASE}/test-twilio-enhanced`)
+                ]);
                 const twilio = await twilioResponse.json();
-                updateStatus(twilioStatus, twilio.success, twilio.success ? 'Connected' : 'Disconnected');
+                const enhancedTwilio = await enhancedTwilioResponse.json();
+                
+                // Use enhanced service status if available, otherwise fall back to original
+                const twilioSuccess = enhancedTwilio.success || twilio.success;
+                const twilioMessage = enhancedTwilio.success ? 'Connected (Enhanced)' : (twilio.success ? 'Connected' : 'Disconnected');
+                updateStatus(twilioStatus, twilioSuccess, twilioMessage);
                 
                 // Check HumeAI EVI (skip actual connection for routine checks to avoid creating agent sessions)
                 const humeEviResponse = await fetch(`${API_BASE}/test-hume-evi?skipConnection=true`);
@@ -373,7 +508,7 @@
                 updateStatus(humeEviStatus, humeEvi.success, humeEvi.success ? 'Connected' : 'Disconnected');
                 
                 // Update call button state - only need Twilio and HumeAI for direct integration
-                const systemReady = health.status === 'ok' && twilio.success && humeEvi.success;
+                const systemReady = health.status === 'ok' && twilioSuccess && humeEvi.success;
                 callBtn.disabled = !systemReady;
                 
                 if (!systemReady) {
@@ -426,11 +561,22 @@
             // Prevent multiple submissions using both button state and flag
             if (callBtn.disabled || isSubmitting) {
                 console.log(`⚠️ [${timestamp}] Call already in progress (button: ${callBtn.disabled}, flag: ${isSubmitting}), ignoring duplicate submission`);
+                e.stopPropagation();
+                e.stopImmediatePropagation();
                 return;
             }
             
-            // Set submission flag
+            // Prevent rapid successive submissions (within 2 seconds)
+            if (timestamp - lastSubmissionTime < 2000) {
+                console.log(`⚠️ [${timestamp}] Rapid submission prevented (${timestamp - lastSubmissionTime}ms since last submission)`);
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                return;
+            }
+            
+            // Set submission flag and timestamp
             isSubmitting = true;
+            lastSubmissionTime = timestamp;
             
             const phoneNumber = document.getElementById('phone-number').value.trim();
             console.log(`📞 [${timestamp}] Processing call request for: ${phoneNumber}`);
@@ -503,7 +649,19 @@
             updateStats();
         });
         
-        // Initial status check
+        // Prevent double-click on call button
+        callBtn.addEventListener('click', (e) => {
+            if (callBtn.disabled || isSubmitting) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                console.log('Double-click prevented on call button');
+                return false;
+            }
+        });
+        
+        // Set active tab and initial status check
+        setActiveTab();
         checkStatus();
         updateStats();
         

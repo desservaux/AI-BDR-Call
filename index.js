@@ -8,9 +8,13 @@ const path = require('path');
 dotenv.config();
 
 // Import services
-const twilioService = require('./services/twilio');
+const twilioService = require('./services/twilio'); // Original service (backup)
+const TwilioWithLoggingService = require('./services/twilio-with-logging'); // Enhanced service class
 const humeEVIService = require('./services/hume-evi'); // HumeAI EVI integration
 const latencyMonitor = require('./services/latency-monitor');
+
+// Create enhanced service instance
+const twilioWithLoggingService = new TwilioWithLoggingService();
 
 const app = express();
 const expressWsInstance = expressWs(app);
@@ -29,6 +33,11 @@ app.get('/', (req, res) => {
 // Serve the latency monitor UI
 app.get('/latency-monitor', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'latency-monitor.html'));
+});
+
+// Serve the call dashboard UI
+app.get('/call-dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'call-dashboard.html'));
 });
 
 // Health check endpoint
@@ -53,6 +62,30 @@ app.get('/test-twilio', async (req, res) => {
     }
 });
 
+// Enhanced Twilio service test endpoint
+app.get('/test-twilio-enhanced', async (req, res) => {
+    try {
+        // Initialize the service
+        twilioWithLoggingService.initialize();
+        
+        // Test the service capabilities
+        const testResult = await twilioWithLoggingService.testConnection();
+        const activeCalls = await twilioWithLoggingService.getActiveCallsWithLogging();
+        
+        res.json({
+            success: true,
+            message: 'Enhanced Twilio service is ready',
+            testResult: testResult,
+            activeCalls: activeCalls.activeCalls.length,
+            statistics: activeCalls.statistics
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
 
 // HumeAI EVI connection test endpoint
 app.get('/test-hume-evi', async (req, res) => {
@@ -110,217 +143,7 @@ app.get('/hume-evi/stats', async (req, res) => {
     }
 });
 
-// LiveKit connection test endpoint
-app.get('/test-livekit', async (req, res) => {
-    try {
-        const result = await liveKitService.testConnection();
-        res.json({
-            success: true,
-            message: 'LiveKit connection test successful',
-            data: result,
-            stats: liveKitService.getStats()
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: `LiveKit connection failed: ${error.message}`,
-            stats: liveKitService.getStats()
-        });
-    }
-});
-
-// LiveKit service statistics endpoint
-app.get('/livekit/stats', async (req, res) => {
-    try {
-        const stats = liveKitService.getStats();
-        res.json({
-            success: true,
-            stats: stats
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// Create LiveKit room endpoint
-app.post('/livekit/rooms', async (req, res) => {
-    try {
-        const { roomName, options } = req.body;
-        
-        if (!roomName) {
-            return res.status(400).json({
-                success: false,
-                message: 'Room name is required'
-            });
-        }
-
-        const result = await liveKitService.createRoom(roomName, options || {});
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// Generate access token endpoint
-app.post('/livekit/token', async (req, res) => {
-    try {
-        const { roomName, participantIdentity, options } = req.body;
-        
-        if (!roomName || !participantIdentity) {
-            return res.status(400).json({
-                success: false,
-                message: 'Room name and participant identity are required'
-            });
-        }
-
-        const result = await liveKitService.generateAccessToken(
-            roomName, 
-            participantIdentity, 
-            options || {}
-        );
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// List LiveKit rooms endpoint
-app.get('/livekit/rooms', async (req, res) => {
-    try {
-        const result = await liveKitService.listRooms();
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// Get room info endpoint
-app.get('/livekit/rooms/:roomName', async (req, res) => {
-    try {
-        const { roomName } = req.params;
-        const result = await liveKitService.getRoomInfo(roomName);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// Delete room endpoint
-app.delete('/livekit/rooms/:roomName', async (req, res) => {
-    try {
-        const { roomName } = req.params;
-        const result = await liveKitService.deleteRoom(roomName);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// SIP Management Endpoints
-
-// Create SIP inbound trunk endpoint
-app.post('/livekit/sip/inbound-trunk', async (req, res) => {
-    try {
-        const config = req.body;
-        const result = await liveKitService.createSIPInboundTrunk(config);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// Create SIP dispatch rule endpoint
-app.post('/livekit/sip/dispatch-rule', async (req, res) => {
-    try {
-        const config = req.body;
-        const result = await liveKitService.createSIPDispatchRule(config);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// List SIP inbound trunks endpoint
-app.get('/livekit/sip/inbound-trunks', async (req, res) => {
-    try {
-        const result = await liveKitService.listSIPInboundTrunks();
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// List SIP dispatch rules endpoint
-app.get('/livekit/sip/dispatch-rules', async (req, res) => {
-    try {
-        const result = await liveKitService.listSIPDispatchRules();
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// Create SIP outbound trunk endpoint
-app.post('/livekit/sip/outbound-trunk', async (req, res) => {
-    try {
-        const config = req.body;
-        const result = await liveKitService.createSIPOutboundTrunk(config);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// List SIP outbound trunks endpoint
-app.get('/livekit/sip/outbound-trunks', async (req, res) => {
-    try {
-        const result = await liveKitService.listSIPOutboundTrunks();
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
-
-// Track recent calls to prevent duplicates
-const recentCalls = new Map();
-
-// 🚀 OFFICIAL CALL ENDPOINT - Ultra-Low Latency Optimized
+// 🚀 OFFICIAL CALL ENDPOINT - Ultra-Low Latency Optimized (Original)
 app.post('/make-call', async (req, res) => {
     try {
         const { phoneNumber, message } = req.body;
@@ -355,6 +178,214 @@ app.post('/make-call', async (req, res) => {
             success: false,
             message: error.message
         });
+    }
+});
+
+// 🚀 ENHANCED CALL ENDPOINT - With Comprehensive Logging
+app.post('/make-call-with-logging', async (req, res) => {
+    try {
+        const { phoneNumber, message } = req.body;
+        
+        if (!phoneNumber) {
+            return res.status(400).json({
+                success: false,
+                message: 'Phone number is required'
+            });
+        }
+
+        console.log(`🚀 Making enhanced call with logging to ${phoneNumber}`);
+
+        // Initialize enhanced service if not already done
+        twilioWithLoggingService.initialize();
+
+        // Use the enhanced Twilio service with comprehensive logging
+        const result = await twilioWithLoggingService.makeCall(phoneNumber, message || 'Hello, this is an AI assistant calling.');
+
+        res.json({
+            success: true,
+            message: 'Enhanced call with logging initiated',
+            callInfo: result,
+            logging: 'enabled',
+            status: 'calling',
+            optimization: 'ultra-low-latency-with-logging'
+        });
+
+    } catch (error) {
+        console.error('❌ Enhanced call failed:', error.message);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// 📊 CALL DASHBOARD ENDPOINTS
+
+// Get all calls with filtering
+app.get('/api/calls', async (req, res) => {
+    try {
+        const { 
+            limit = 50, 
+            offset = 0, 
+            phoneNumber, 
+            bookingOutcome, 
+            status,
+            startDate,
+            endDate
+        } = req.query;
+
+        const filters = {
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            phoneNumber,
+            bookingOutcome,
+            status,
+            startDate,
+            endDate
+        };
+
+        const calls = await twilioWithLoggingService.getCallHistory(filters);
+        res.json({
+            success: true,
+            calls: calls,
+            total: calls.length,
+            filters: filters
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Get active calls
+app.get('/api/calls/active', async (req, res) => {
+    try {
+        const activeCalls = await twilioWithLoggingService.getActiveCallsWithLogging();
+        res.json({
+            success: true,
+            activeCalls: activeCalls.activeCalls,
+            statistics: activeCalls.statistics,
+            pendingCalls: activeCalls.pendingCalls,
+            chatMappings: activeCalls.chatMappings
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Export call data
+app.get('/api/calls/export', async (req, res) => {
+    try {
+        const { format = 'json', ...filters } = req.query;
+        const exportData = await twilioWithLoggingService.exportCallData(filters);
+        
+        if (format === 'csv') {
+            // Convert to CSV format
+            const csvHeaders = ['id', 'phone_number', 'start_time', 'end_time', 'duration', 'status', 'booking_outcome', 'confidence_score'];
+            const csvData = exportData.map(call => csvHeaders.map(header => call[header]).join(','));
+            const csvContent = [csvHeaders.join(','), ...csvData].join('\n');
+            
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', 'attachment; filename="calls-export.csv"');
+            res.send(csvContent);
+        } else {
+            res.json({
+                success: true,
+                data: exportData,
+                format: 'json'
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Get call statistics
+app.get('/api/calls/stats', async (req, res) => {
+    try {
+        const stats = await twilioWithLoggingService.getActiveCallsWithLogging();
+        res.json({
+            success: true,
+            statistics: stats.statistics,
+            activeCalls: stats.activeCalls.length
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Get call details (must be last to avoid catching other routes)
+app.get('/api/calls/:callId', async (req, res) => {
+    try {
+        const { callId } = req.params;
+        const callDetails = await twilioWithLoggingService.getCallDetails(callId);
+        
+        if (!callDetails) {
+            return res.status(404).json({
+                success: false,
+                message: 'Call not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            call: callDetails
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Webhook endpoint for call status updates
+app.post('/webhook/call-status', async (req, res) => {
+    try {
+        const { CallSid, CallStatus, CallDuration } = req.body;
+        console.log(`📞 Call status update: ${CallSid} - ${CallStatus}`);
+
+        // Handle call completion with enhanced service
+        if (CallStatus === 'completed' || CallStatus === 'failed' || CallStatus === 'busy' || CallStatus === 'no-answer') {
+            await twilioWithLoggingService.handleCallCompletion(CallSid, CallStatus);
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error handling call status webhook:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Webhook endpoint for HumeAI chat metadata
+app.post('/webhook/hume-chat', async (req, res) => {
+    try {
+        const { chat_id, chat_group_id, request_id, call_sid } = req.body;
+        console.log(`💬 HumeAI chat metadata received: ${chat_id}`);
+
+        if (chat_id && call_sid) {
+            await twilioWithLoggingService.processChatMetadata({
+                chat_id,
+                chat_group_id,
+                request_id
+            }, call_sid);
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error handling HumeAI chat webhook:', error.message);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
@@ -513,7 +544,7 @@ const server = app.listen(PORT, async () => {
     console.log(`📊 Health check: http://localhost:${PORT}/health`);
     console.log(`🔗 WebSocket endpoint: ws://localhost:${PORT}/media-stream`);
     // Environment validation
-    const requiredEnvVars = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'PLAYAI_API_KEY', 'PLAYAI_USER_ID', 'LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET', 'LIVEKIT_WS_URL'];
+    const requiredEnvVars = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER', 'HUME_API_KEY'];
     const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
     if (missingEnvVars.length > 0) {
         console.warn('⚠️  Missing environment variables:', missingEnvVars.join(', '));
@@ -522,8 +553,7 @@ const server = app.listen(PORT, async () => {
         console.log('✅ All required environment variables are configured');
         console.log('🔗 API connections ready:');
         console.log('   - Twilio: ✅');
-        console.log('   - Play.ht: ✅');
-        console.log('   - Play.ai Agent: 🤖');
+        console.log('   - HumeAI EVI: ✅');
     }
     // Initialize all services
     await initializeServices();

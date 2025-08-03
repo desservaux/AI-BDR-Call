@@ -62,8 +62,8 @@ class TwilioService {
      */
     getCredentials() {
         return {
-            accountSid: 'ACe35419debddfa2d27efe6de4115f698c', // Real Account SID
-            authToken: '223d73109eea82c0539efbc7730cf2bb', // Real Auth Token
+            accountSid: process.env.TWILIO_ACCOUNT_SID || 'ACe35419debddfa2d27efe6de4115f698c',
+            authToken: process.env.TWILIO_AUTH_TOKEN || 'ee9c2764dea5cf13481fec5895e2b6ed',
             phoneNumber: process.env.TWILIO_PHONE_NUMBER || '+447846855904'
         };
     }
