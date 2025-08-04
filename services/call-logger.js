@@ -1,9 +1,9 @@
-const HumeChatHistoryService = require('./hume-chat-history');
+const elevenLabsService = require('./elevenlabs');
 const SupabaseDBService = require('./supabase-db');
 
 class CallLoggerService {
     constructor() {
-        this.humeService = new HumeChatHistoryService();
+        this.elevenLabsService = elevenLabsService; // Use the exported instance
         this.dbService = new SupabaseDBService();
         this.activeCalls = new Map(); // Track active calls
         this.callEventQueue = new Map(); // Queue events for processing
@@ -11,7 +11,7 @@ class CallLoggerService {
 
     /**
      * Start logging a new call
-     * @param {Object} callData - Call data from Twilio
+     * @param {Object} callData - Call data from ElevenLabs
      * @returns {Promise<Object>} Created call record
      */
     async startCallLogging(callData) {
@@ -21,25 +21,24 @@ class CallLoggerService {
             // Create call record in database
             const dbCallData = {
                 phoneNumber: callData.phoneNumber,
-                chatId: callData.chatId,
-                chatGroupId: callData.chatGroupId,
+                elevenlabs_conversation_id: callData.conversationId,
                 status: 'active'
             };
 
             const createdCall = await this.dbService.createCall(dbCallData);
             
             // Track active call
-            this.activeCalls.set(callData.chatId, {
+            this.activeCalls.set(callData.conversationId, {
                 callId: createdCall.id,
                 phoneNumber: callData.phoneNumber,
-                chatId: callData.chatId,
-                chatGroupId: callData.chatGroupId,
+                conversationId: callData.conversationId,
+                callSid: callData.callSid,
                 startTime: new Date(),
                 events: []
             });
 
             // Initialize event queue for this call
-            this.callEventQueue.set(callData.chatId, []);
+            this.callEventQueue.set(callData.conversationId, []);
 
             console.log(`✅ Call logging started for call ID: ${createdCall.id}`);
             return createdCall;
@@ -51,50 +50,65 @@ class CallLoggerService {
 
     /**
      * End call logging and process final data
-     * @param {string} chatId - Chat ID from HumeAI
+     * @param {string} conversationId - Conversation ID from ElevenLabs
      * @param {string} status - Final call status (completed, failed)
      * @returns {Promise<Object>} Final call data with transcriptions
      */
-    async endCallLogging(chatId, status = 'completed') {
+    async endCallLogging(conversationId, status = 'completed') {
         try {
-            console.log(`📞 Ending call logging for chat ID: ${chatId}`);
+            console.log(`📞 Ending call logging for conversation ID: ${conversationId}`);
             
-            const activeCall = this.activeCalls.get(chatId);
+            const activeCall = this.activeCalls.get(conversationId);
             if (!activeCall) {
-                throw new Error(`No active call found for chat ID: ${chatId}`);
+                throw new Error(`No active call found for conversation ID: ${conversationId}`);
             }
 
             // Update call status in database
             await this.dbService.updateCallStatus(activeCall.callId, status);
 
-            // Process conversation data from HumeAI
-            console.log('📝 Processing conversation data from HumeAI...');
-            const conversationData = await this.humeService.getConversationData(chatId, activeCall.callId);
+            // Process conversation data from ElevenLabs
+            console.log('📝 Processing conversation data from ElevenLabs...');
+            const conversationData = await this.elevenLabsService.getConversationDetails(conversationId);
 
             // Store transcriptions in database
-            if (conversationData.transcriptionData.length > 0) {
-                await this.dbService.insertTranscriptions(conversationData.transcriptionData);
-                console.log(`✅ Stored ${conversationData.transcriptionData.length} transcription records`);
+            if (conversationData.transcript && conversationData.transcript.length > 0) {
+                const transcriptionData = conversationData.transcript.map(message => ({
+                    call_id: activeCall.callId,
+                    speaker: message.speaker,
+                    message: message.text,
+                    timestamp: message.timestamp,
+                    event_type: message.message_type
+                }));
+                
+                await this.dbService.insertTranscriptions(transcriptionData);
+                console.log(`✅ Stored ${transcriptionData.length} transcription records`);
             }
 
-            // Store events in database
-            if (conversationData.eventData.length > 0) {
-                await this.dbService.insertEvents(conversationData.eventData);
-                console.log(`✅ Stored ${conversationData.eventData.length} event records`);
+            // Store events in database (ElevenLabs doesn't provide separate events, so we store messages as events)
+            if (conversationData.messages && conversationData.messages.length > 0) {
+                const eventData = conversationData.messages.map(message => ({
+                    call_id: activeCall.callId,
+                    event_type: message.message_type || 'message',
+                    event_data: JSON.stringify(message),
+                    timestamp: message.timestamp || new Date().toISOString()
+                }));
+                
+                await this.dbService.insertEvents(eventData);
+                console.log(`✅ Stored ${eventData.length} event records`);
             }
 
             // Clean up tracking
-            this.activeCalls.delete(chatId);
-            this.callEventQueue.delete(chatId);
+            this.activeCalls.delete(conversationId);
+            this.callEventQueue.delete(conversationId);
 
             console.log(`✅ Call logging completed for call ID: ${activeCall.callId}`);
             
             return {
                 callId: activeCall.callId,
-                chatId: chatId,
+                conversationId: conversationId,
                 status: status,
-                totalEvents: conversationData.totalEvents,
-                totalMessages: conversationData.totalMessages,
+                totalEvents: conversationData.messages?.length || 0,
+                totalMessages: conversationData.total_messages || 0,
                 transcript: conversationData.transcript
             };
         } catch (error) {
@@ -250,10 +264,11 @@ class CallLoggerService {
         try {
             console.log('🧪 Testing Call Logger Service...');
             
-            const humeTest = await this.humeService.testConnection();
+            // Test ElevenLabs service connection
+            const elevenLabsTest = await this.elevenLabsService.testConnection();
             const dbTest = await this.dbService.testConnection();
             
-            if (humeTest && dbTest) {
+            if (elevenLabsTest.success && dbTest) {
                 console.log('✅ Call Logger Service is ready');
                 return true;
             } else {

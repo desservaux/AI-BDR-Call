@@ -1,0 +1,6 @@
+first_name,last_name,email,company_name,position,phone_number,phone_type,is_primary,do_not_call,notes
+John,Doe,john.doe@example.com,Acme Corp,Manager,+1234567890,mobile,true,false,With plus prefix
+Jane,Smith,jane.smith@example.com,Tech Solutions,Developer,1987654321,mobile,true,false,Without plus prefix
+Bob,Johnson,bob@bigcompany.com,Big Company,CEO,1555123456,work,true,false,Another without plus
+Alice,Brown,alice@startup.io,Startup Inc,Founder,+1444123456,mobile,true,false,With plus prefix
+Mike,Davis,mike@consulting.com,Consulting LLC,Partner,1777123456,work,true,false,Without plus prefix 
