@@ -316,7 +316,9 @@ s    }
                 console.log(`⚠️ Skipping Gemini analysis - service not available`);
             }
 
-            // Apply sequence tracking if service is available
+            // DISABLED: Apply sequence tracking if service is available
+            // Sequence functionality temporarily disabled to focus on ElevenLabs sync
+            /*
             if (this.sequenceManager.initialized) {
                 try {
                     console.log(`📅 Applying sequence tracking for call ${callId}...`);
@@ -339,6 +341,7 @@ s    }
             } else {
                 console.log(`⚠️ Skipping sequence tracking - service not available`);
             }
+            */
         } catch (error) {
             console.error(`❌ Error processing detailed conversation ${conversationId}:`, error.message);
         }
@@ -611,35 +614,7 @@ s    }
         }
     }
 
-    /**
-     * Test the sync service
-     * @returns {Promise<Object>} Test results
-     */
-    async testService() {
-        try {
-            console.log('🧪 Testing Call Sync Service...');
-            
-            const initResult = await this.initialize();
-            if (!initResult) {
-                throw new Error('Service initialization failed');
-            }
 
-            // Test with a small sync
-            const syncResult = await this.syncAllConversations({ limit: 5 });
-            
-            return {
-                success: true,
-                message: 'Call Sync Service test successful',
-                sync_results: syncResult
-            };
-        } catch (error) {
-            console.error('❌ Call Sync Service test failed:', error.message);
-            return {
-                success: false,
-                message: `Test failed: ${error.message}`
-            };
-        }
-    }
 }
 
 module.exports = new CallSyncService(); 

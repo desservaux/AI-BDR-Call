@@ -429,14 +429,6 @@
             display: block;
         }
         
-        /* Ensure calls table is only visible in calls tab */
-        #contacts-tab .calls-table,
-        #sequences-tab .calls-table,
-        #phone-numbers-tab .calls-table,
-        #analytics-tab .calls-table {
-            display: none !important;
-        }
-        
         .dashboard-header {
             display: flex;
             justify-content: space-between;
@@ -1426,12 +1418,6 @@
                         <button class="btn btn-secondary" id="clear-filters-btn">Clear All</button>
                     </div>
                 </div>
-                        <div class="filter-group">
-                            <label for="filter-phone">Phone Number</label>
-                            <input type="text" id="filter-phone" placeholder="Search phone number">
-                        </div>
-                    </div>
-                </div>
 
                 <div class="search-section">
                     <div class="search-container">
@@ -1792,10 +1778,8 @@
             // Show active content
             dashboardContents.forEach(content => {
                 content.classList.remove('active');
-                content.style.display = 'none';
                 if (content.id === `${tabName}-tab`) {
                     content.classList.add('active');
-                    content.style.display = 'block';
                 }
             });
             
@@ -1806,19 +1790,10 @@
                 loadAnalytics();
             } else if (tabName === 'contacts') {
                 loadContacts(1);
-                // Ensure no call content is visible
-                const callsTable = document.querySelector('#contacts-tab .calls-table');
-                if (callsTable) callsTable.style.display = 'none';
             } else if (tabName === 'sequences') {
                 loadSequences(1);
-                // Ensure no call content is visible
-                const callsTable = document.querySelector('#sequences-tab .calls-table');
-                if (callsTable) callsTable.style.display = 'none';
             } else if (tabName === 'phone-numbers') {
                 loadPhoneNumbers(1);
-                // Ensure no call content is visible
-                const callsTable = document.querySelector('#phone-numbers-tab .calls-table');
-                if (callsTable) callsTable.style.display = 'none';
             }
         }
         
@@ -3744,22 +3719,6 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', () => {
             initDashboard();
-            
-            // Force hide all tabs except main tab on initial load
-            const allTabs = document.querySelectorAll('.dashboard-content');
-            allTabs.forEach(tab => {
-                if (tab.id !== 'main-tab') {
-                    tab.style.display = 'none';
-                    tab.classList.remove('active');
-                }
-            });
-            
-            // Ensure main tab is visible
-            const mainTab = document.getElementById('main-tab');
-            if (mainTab) {
-                mainTab.style.display = 'block';
-                mainTab.classList.add('active');
-            }
             
             // Add event listeners for new buttons
             const addContactBtn = document.getElementById('add-contact-btn');

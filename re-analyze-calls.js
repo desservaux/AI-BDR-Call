@@ -32,10 +32,22 @@ async function reAnalyzeAllCalls() {
         let errorCount = 0;
         
         for (const call of calls) {
-            console.log(`\n📞 Analyzing call: ${call.id}`);
+            console.log(`\n📞 Analyzing call: ${call.id} (status: ${call.status}, successful: ${call.call_successful}, duration: ${call.duration_seconds}s)`);
             
             if (!call.elevenlabs_conversation_id) {
                 console.log(`⚠️ Skipping call ${call.id} - no conversation ID`);
+                continue;
+            }
+            
+            // Skip calls that were not successful
+            if (!call.call_successful) {
+                console.log(`⚠️ Skipping call ${call.id} - call was not successful`);
+                continue;
+            }
+            
+            // Skip calls with very short duration
+            if (call.duration_seconds && call.duration_seconds < 10) {
+                console.log(`⚠️ Skipping call ${call.id} - duration too short (${call.duration_seconds}s)`);
                 continue;
             }
             

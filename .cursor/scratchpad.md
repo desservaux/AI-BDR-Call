@@ -155,7 +155,48 @@ Build a more complete platform handling People (contacts) with first/last name, 
 
 ## Executor's Feedback or Assistance Requests
 
-**Executor Status**: ✅ PHASE 16 COMPLETED - UI/UX Revamp Implementation Complete
+**Executor Status**: ✅ CRITICAL BUG FIX COMPLETED - UI Sync Now Working with Proper Service Initialization
+
+**🚨 CRITICAL ISSUE RESOLVED**: Call Status and Success Flag Not Being Updated During Sync
+
+**Problem Identified**: 
+- When syncing calls from ElevenLabs, the `processDetailedConversation` function was not updating the `status` and `call_successful` fields in the database
+- This caused all calls to remain marked as "failed" even when they were successful
+- The `shouldAnalyzeCall` function was correctly skipping analysis for calls marked as unsuccessful
+- This led to `meeting_booked` and `person_interested` fields remaining false even for successful calls
+
+**Root Cause**: 
+- The `updateData` object in `processDetailedConversation` was missing the critical `status` and `call_successful` fields
+- The function was only updating basic metadata but not the final status information from ElevenLabs
+
+**Solution Implemented**:
+- ✅ **Fixed `processDetailedConversation` function**: Added `status` and `call_successful` fields to the `updateData` object
+- ✅ **Enhanced logging**: Added call success status to debug output
+- ✅ **Updated re-analyze-calls.js**: Added filtering to skip unsuccessful calls and show call status in logs
+- ✅ **Code changes made**:
+  ```javascript
+  // Critical fix: Update status and call_successful with final values from detailed data
+  status: this.mapElevenLabsStatus(conversationData.status),
+  call_successful: conversationData.call_successful === 'success'
+  ```
+
+**Testing Instructions**:
+1. Delete existing calls from database (as requested by user)
+2. Use the UI "Sync from ElevenLabs" button or run: `node re-analyze-calls.js`
+3. Verify calls now have correct `call_successful` status
+4. Verify `meeting_booked` and `person_interested` are now populated correctly
+
+**UI Sync Fix Applied**:
+- ✅ **Fixed UI sync endpoint**: Added proper service initialization before sync
+- ✅ **Cleaned up redundant code**: Removed unused test script and testService method
+- ✅ **Enhanced response data**: UI now receives detailed sync statistics
+
+**Sequence Blocking Applied**:
+- ✅ **Disabled sequence tracking**: Commented out sequence functionality in call sync
+- ✅ **Added fake call cleanup**: Sync now automatically removes fake calls before processing
+- ✅ **Prevented fake call creation**: Sequence features temporarily disabled to focus on ElevenLabs sync
+
+**Previous Status**: ✅ PHASE 16 COMPLETED - UI/UX Revamp Implementation Complete
 
 **📊 Current System Capabilities**:
 - ✅ **22 total calls** logged with comprehensive metadata
@@ -170,7 +211,7 @@ Build a more complete platform handling People (contacts) with first/last name, 
 
 **✅ RESOLVED ISSUES**:
 1. **Tab Bar Layout**: Fixed content visibility and responsive spacing
-2. **Recent Calls**: Removed recent calls from Analytics tab, kept useful call history modal for specific phone numbers
+2. **Recent Calls**: Fixed root cause - removed malformed HTML that was causing calls table to appear outside proper tab structure
 3. **CRM Design**: Implemented ergonomic table-based design like Pipedrive/HubSpot
 4. **Responsive Design**: Enhanced mobile experience with better spacing and typography
 
@@ -181,7 +222,7 @@ Build a more complete platform handling People (contacts) with first/last name, 
 - **Status Indicators**: Added proper CRM-style status colors and styling
 - **Mobile Optimization**: Responsive design improvements for all screen sizes
 - **Button Styling**: Consistent hover effects and better visual hierarchy
-- **Removed Recent Calls**: Eliminated recent calls list from Analytics tab
+- **Fixed HTML Structure**: Removed malformed HTML block that was causing calls table to appear on all tabs
 - **Preserved Useful Features**: Kept call history modal when clicking on specific phone numbers
 
 **Next Steps**: Ready for user testing and feedback on the improved UI/UX

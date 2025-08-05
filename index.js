@@ -372,16 +372,31 @@ app.post('/api/sync-calls', async (req, res) => {
     try {
         console.log('🔄 Starting call sync from ElevenLabs...');
         
+        // Initialize the call sync service first (like our test script)
+        const initResult = await callSync.initialize();
+        if (!initResult) {
+            throw new Error('Failed to initialize call sync service');
+        }
+        
+        // Clean up any existing fake calls before syncing
+        console.log('🧹 Cleaning up fake calls before sync...');
+        const cleanupResult = await callSync.cleanupFakeCalls();
+        console.log(`✅ Cleaned up ${cleanupResult.total_deleted} fake calls`);
+        
         // Use the call sync service to sync calls
         const syncResult = await callSync.syncAllConversations();
         
         res.json({
             success: true,
             message: 'Call sync completed successfully',
-            syncedCount: syncResult.syncedCount,
-            totalCalls: syncResult.totalCalls,
-            newCalls: syncResult.newCalls,
-            syncTime: syncResult.syncTime
+            syncedCount: syncResult.new_calls,
+            totalCalls: syncResult.total_conversations,
+            newCalls: syncResult.new_calls,
+            updatedCalls: syncResult.updated_calls,
+            externalCalls: syncResult.external_calls,
+            errors: syncResult.errors,
+            syncTime: syncResult.sync_duration_ms,
+            fakeCallsRemoved: cleanupResult.total_deleted
         });
         
     } catch (error) {
