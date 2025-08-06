@@ -208,13 +208,11 @@ function mapCallStatus(call) {
         return call.call_result;
     }
     
-    // Fallback to legacy status mapping for older calls
-    if (call.call_successful === true && call.duration_seconds > 0) {
-        return 'answered'; // Successful connection with conversation
-    } else if (call.call_successful === false || (call.duration_seconds === 0 && call.call_successful === false)) {
-        return 'failed'; // Call couldn't go through
-    } else if (call.duration_seconds === 0 && call.call_successful === true) {
-        return 'unanswered'; // Ring but no answer
+    // Fallback to duration-based logic for legacy data
+    if (call.duration_seconds > 5) {
+        return 'answered';
+    } else if (call.duration_seconds > 0) {
+        return 'unanswered';
     } else {
         return call.status || 'unknown'; // Fallback to original status
     }
@@ -450,7 +448,7 @@ async function getEnhancedAnalytics() {
         
         const { data: recentCalls, error } = await supabaseDb.client
             .from('calls')
-            .select('created_at, status, duration_seconds, call_successful, phone_number')
+            .select('created_at, status, duration_seconds, call_result, phone_number')
             .gte('created_at', thirtyDaysAgo.toISOString())
             .order('created_at', { ascending: true });
 
@@ -510,7 +508,7 @@ function processCallDataForCharts(calls) {
         const date = new Date(call.created_at).toISOString().split('T')[0];
         const hour = new Date(call.created_at).getHours();
         const duration = call.duration_seconds || 0;
-        const isSuccessful = call.call_successful === true;
+        const isSuccessful = call.call_result === 'answered'; // Use call_result for success
         const status = call.status || 'unknown';
         
         // Daily calls
@@ -580,13 +578,13 @@ function processCallDataForCharts(calls) {
     const recentTrends = {
         recentPeriod: {
             totalCalls: recentCalls.length,
-            successfulCalls: recentCalls.filter(call => call.call_successful === true).length,
+            successfulCalls: recentCalls.filter(call => call.call_result === 'answered').length,
             avgDuration: recentCalls.length > 0 ? 
                 Math.round(recentCalls.reduce((sum, call) => sum + (call.duration_seconds || 0), 0) / recentCalls.length / 60) : 0
         },
         previousPeriod: {
             totalCalls: previousCalls.length,
-            successfulCalls: previousCalls.filter(call => call.call_successful === true).length,
+            successfulCalls: previousCalls.filter(call => call.call_result === 'answered').length,
             avgDuration: previousCalls.length > 0 ? 
                 Math.round(previousCalls.reduce((sum, call) => sum + (call.duration_seconds || 0), 0) / previousCalls.length / 60) : 0
         }

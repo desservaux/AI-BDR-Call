@@ -266,12 +266,23 @@ class ElevenLabsService {
 
             const response = await this.client.get(`/convai/conversations?${params.toString()}`);
             
-            console.log(`✅ Retrieved ${response.data.conversations?.length || 0} conversations`);
+            // Normalize each conversation object before returning
+            const normalizedConversations = (response.data.conversations || []).map(item => ({
+                ...item,
+                // Add start_time from start_time_unix_secs
+                start_time: item.start_time_unix_secs ? new Date(item.start_time_unix_secs * 1000).toISOString() : null,
+                // Add duration from call_duration_secs
+                duration: item.call_duration_secs || 0,
+                // Optionally attach to_number if present (may be null)
+                to_number: item.to_number || null
+            }));
+            
+            console.log(`✅ Retrieved ${normalizedConversations.length} conversations`);
             console.log(`📊 Total conversations available: ${response.data.total_count || 'unknown'}`);
             
             return {
                 success: true,
-                conversations: response.data.conversations || [],
+                conversations: normalizedConversations,
                 total_count: response.data.total_count || 0,
                 next_cursor: response.data.next_cursor || null,
                 has_more: response.data.has_more || false
@@ -304,12 +315,11 @@ class ElevenLabsService {
                 to_number: response.data.external_number || response.data.metadata?.phone_call?.external_number || response.data.metadata?.external_number || response.data.to_number,
                 agent_number: response.data.agent_number || response.data.metadata?.phone_call?.agent_number || response.data.metadata?.agent_number,
                 external_number: response.data.external_number || response.data.metadata?.phone_call?.external_number || response.data.metadata?.external_number,
-                start_time: response.data.metadata?.start_time_unix_secs ? new Date(response.data.metadata.start_time_unix_secs * 1000).toISOString() : response.data.start_time || null,
+                start_time: response.data.metadata?.start_time_unix_secs ? new Date(response.data.metadata.start_time_unix_secs * 1000).toISOString() : null,
                 end_time: response.data.end_time,
-                duration: response.data.duration || response.data.metadata?.call_duration_secs,
+                duration: response.data.metadata?.call_duration_secs || response.data.duration || 0,
                 status: response.data.status,
-                // =========== FIX 3: Correctly map call_successful from the nested analysis object ===========
-                call_successful: response.data.analysis?.call_successful,
+                // Do NOT read or pass through analysis.call_successful
                 message_count: response.data.message_count || (response.data.messages ? response.data.messages.length : 0),
                 transcript_summary: response.data.transcript_summary,
                 call_summary_title: response.data.call_summary_title,

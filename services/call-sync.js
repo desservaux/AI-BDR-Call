@@ -163,6 +163,13 @@ s    }
         };
 
         try {
+            // Early skip of non-final calls
+            if (['initiated', 'in-progress', 'processing'].includes(conversation.status)) {
+                console.log(`⏭️ Skipping non-final call ${conversation.conversation_id} with status: ${conversation.status}`);
+                result.error = 'Non-final call status';
+                return result;
+            }
+
             // Validate conversation data - only process if it has required fields
             if (!this.isValidCallConversation(conversation)) {
                 console.log(`⚠️ Skipping invalid conversation ${conversation.conversation_id} - missing required data`);
@@ -178,18 +185,70 @@ s    }
                 result.is_external = !this.isInternalCall(conversation);
                 result.is_new = true;
 
-                // Create new call record
-                const callData = this.convertConversationToCallData(conversation, result.is_external);
-                console.log(`📞 Creating call with phone: ${callData.phone_number}, conversation_id: ${callData.elevenlabs_conversation_id}`);
-                console.log(`🔍 Raw conversation data: ${JSON.stringify(conversation).substring(0, 200)}...`);
-                const createdCall = await this.dbService.createCall(callData);
-                
-                console.log(`✅ Created new call record: ${createdCall.id} (${result.is_external ? 'external' : 'internal'})`);
-                
-                // If it's a completed call, get detailed conversation data
-                // =========== FIX 1: Broaden condition to fetch details ===========
-                if (['done', 'failed', 'processing'].includes(conversation.status) && conversation.call_duration_secs > 0) {
-                    await this.processDetailedConversation(conversation.conversation_id, createdCall.id);
+                // Always fetch details for final calls before insert
+                if (['done', 'failed'].includes(conversation.status)) {
+                    console.log(`📋 Fetching detailed conversation data for final call ${conversation.conversation_id}...`);
+                    const detailedData = await this.elevenLabsService.getConversationDetailsEnhanced(conversation.conversation_id);
+                    
+                    if (detailedData.success) {
+                        // Build consolidated object from details
+                        const consolidatedData = {
+                            start_time: detailedData.start_time,
+                            duration: detailedData.duration,
+                            to_number: detailedData.to_number,
+                            status_raw: detailedData.status
+                        };
+                        
+                        // Derive outcomes we own
+                        let call_result, answered;
+                        if (consolidatedData.status_raw === 'done') {
+                            if (consolidatedData.duration > 5) {
+                                call_result = 'answered';
+                                answered = true;
+                            } else {
+                                call_result = 'unanswered';
+                                answered = false;
+                            }
+                        } else if (consolidatedData.status_raw === 'failed') {
+                            if (consolidatedData.duration > 5) {
+                                call_result = 'answered';
+                                answered = true; // Override edge case
+                            } else {
+                                call_result = 'failed';
+                                answered = false;
+                            }
+                        }
+                        
+                        // Create new call record with consolidated data
+                        const callData = this.convertConversationToCallData(conversation, result.is_external);
+                        callData.start_time = consolidatedData.start_time;
+                        callData.duration_seconds = consolidatedData.duration;
+                        callData.phone_number = consolidatedData.to_number || 'unknown';
+                        callData.call_result = call_result;
+                        callData.answered = answered;
+                        callData.status = consolidatedData.status_raw; // Keep raw ElevenLabs status
+                        
+                        console.log(`📞 Creating call with phone: ${callData.phone_number}, conversation_id: ${callData.elevenlabs_conversation_id}`);
+                        console.log(`🔍 Call result: ${callData.call_result}, answered: ${callData.answered}, duration: ${callData.duration_seconds}s`);
+                        
+                        const createdCall = await this.dbService.createCall(callData);
+                        console.log(`✅ Created new call record: ${createdCall.id} (${result.is_external ? 'external' : 'internal'})`);
+                        
+                        // Store transcript/messages if available, then trigger Gemini analysis separately
+                        if (detailedData.transcript && detailedData.transcript.length > 0) {
+                            await this.processDetailedConversation(conversation.conversation_id, createdCall.id);
+                        }
+                    } else {
+                        console.warn(`⚠️ Failed to get detailed data for ${conversation.conversation_id}, creating basic record`);
+                        const callData = this.convertConversationToCallData(conversation, result.is_external);
+                        const createdCall = await this.dbService.createCall(callData);
+                        console.log(`✅ Created basic call record: ${createdCall.id}`);
+                    }
+                } else {
+                    // For non-final calls that somehow got through, create basic record
+                    const callData = this.convertConversationToCallData(conversation, result.is_external);
+                    const createdCall = await this.dbService.createCall(callData);
+                    console.log(`✅ Created basic call record: ${createdCall.id}`);
                 }
             } else {
                 // Update existing call if needed
@@ -227,22 +286,51 @@ s    }
                 return;
             }
 
-            // =========== FIX 2: Update record with final status and success flag ===========
+            // Build consolidated object from details
+            const consolidatedData = {
+                start_time: conversationData.start_time,
+                duration: conversationData.duration,
+                to_number: conversationData.to_number,
+                status_raw: conversationData.status
+            };
+            
+            // Derive outcomes we own
+            let call_result, answered;
+            if (consolidatedData.status_raw === 'done') {
+                if (consolidatedData.duration > 5) {
+                    call_result = 'answered';
+                    answered = true;
+                } else {
+                    call_result = 'unanswered';
+                    answered = false;
+                }
+            } else if (consolidatedData.status_raw === 'failed') {
+                if (consolidatedData.duration > 5) {
+                    call_result = 'answered';
+                    answered = true; // Override edge case
+                } else {
+                    call_result = 'failed';
+                    answered = false;
+                }
+            }
+            
+            // Update record with final status and our computed outcomes
             const updateData = {
                 elevenlabs_conversation_id: conversationId,
-                phone_number: conversationData.to_number || conversationData.external_number,
-                duration_seconds: conversationData.duration,
+                phone_number: consolidatedData.to_number || conversationData.external_number,
+                duration_seconds: consolidatedData.duration,
                 message_count: conversationData.message_count,
-                start_time: conversationData.start_time,
+                start_time: consolidatedData.start_time,
                 call_summary_title: conversationData.call_summary_title,
                 transcript_summary: conversationData.transcript_summary,
                 updated_at: new Date().toISOString(),
-                // Add these crucial fields to save the final, accurate status
-                status: this.mapElevenLabsStatus(conversationData.status),
-                call_successful: conversationData.call_successful === 'success'
+                // Use our computed outcomes instead of ElevenLabs' call_successful
+                status: consolidatedData.status_raw, // Keep raw ElevenLabs status
+                call_result: call_result,
+                answered: answered
             };
             
-            console.log(`🔧 Updating call ${callId} with phone: ${updateData.phone_number}, duration: ${updateData.duration_seconds}s, status: ${updateData.status}, successful: ${updateData.call_successful}`);
+            console.log(`🔧 Updating call ${callId} with phone: ${updateData.phone_number}, duration: ${updateData.duration_seconds}s, status: ${updateData.status}, call_result: ${updateData.call_result}, answered: ${updateData.answered}`);
             
             await this.dbService.updateCall(callId, updateData);
             console.log(`✅ Updated call ${callId} with detailed information`);
@@ -253,101 +341,39 @@ s    }
                     call_id: callId,
                     speaker: message.speaker,
                     message: message.text,
-                    timestamp: message.timestamp,
-                    event_type: message.message_type
+                    timestamp: message.timestamp || new Date().toISOString(),
+                    event_type: message.message_type || 'message'
                 }));
-                
-                await this.dbService.insertTranscriptions(transcriptionData);
-                console.log(`✅ Stored ${transcriptionData.length} transcription records`);
-            }
 
-            // Store events if available
-            if (conversationData.messages && conversationData.messages.length > 0) {
-                const eventData = conversationData.messages.map(message => ({
-                    call_id: callId,
-                    event_type: message.message_type || 'message',
-                    event_data: JSON.stringify(message),
-                    timestamp: message.timestamp || new Date().toISOString()
-                }));
+                // Clear existing transcriptions for this call
+                await this.dbService.deleteTranscriptionsByCallId(callId);
                 
-                await this.dbService.insertEvents(eventData);
-                console.log(`✅ Stored ${eventData.length} event records`);
-            }
-
-            // Perform Gemini analysis if service is available and call is worth analyzing
-            let analysisResults = null;
-            if (this.geminiService.initialized) {
-                // Check if call is worth analyzing based on metadata
-                const shouldAnalyze = this.shouldAnalyzeCall(conversationData);
-                
-                if (shouldAnalyze && conversationData.transcript && conversationData.transcript.length > 0) {
-                    try {
-                        console.log(`🔍 Performing Gemini analysis for ${conversationId}...`);
-                        
-                        // Create full transcript text
-                        const transcriptText = conversationData.transcript
-                            .map(message => `${message.speaker}: ${message.text}`)
-                            .join('\n');
-                        
-                        // Prepare metadata for analysis
-                        const metadata = {
-                            duration_seconds: conversationData.duration,
-                            call_summary_title: conversationData.call_summary_title,
-                            conversation_id: conversationId,
-                            call_id: callId
-                        };
-                        
-                        // Perform analysis
-                        const analysis = await this.geminiService.analyzeTranscript(transcriptText, metadata);
-                        
-                        if (analysis.success) {
-                            // Store analysis results in database
-                            await this.storeAnalysisResults(callId, analysis.analysis);
-                            analysisResults = analysis.analysis;
-                            console.log(`✅ Gemini analysis completed and stored for call ${callId}`);
-                        } else {
-                            console.warn(`⚠️ Gemini analysis failed for call ${callId}`);
-                        }
-                    } catch (analysisError) {
-                        console.error(`❌ Error performing Gemini analysis for ${conversationId}:`, analysisError.message);
-                    }
-                } else if (!shouldAnalyze) {
-                    console.log(`⚠️ Skipping Gemini analysis - call not worth analyzing (${this.getSkipReason(conversationData)})`);
-                } else {
-                    console.log(`⚠️ Skipping Gemini analysis - no transcript available`);
+                // Insert new transcriptions
+                if (transcriptionData.length > 0) {
+                    await this.dbService.createTranscriptions(transcriptionData);
+                    console.log(`✅ Stored ${transcriptionData.length} transcriptions for call ${callId}`);
                 }
-            } else {
-                console.log(`⚠️ Skipping Gemini analysis - service not available`);
             }
 
-            // DISABLED: Apply sequence tracking if service is available
-            // Sequence functionality temporarily disabled to focus on ElevenLabs sync
-            /*
-            if (this.sequenceManager.initialized) {
+            // Trigger Gemini analysis if conditions are met
+            if (this.shouldAnalyzeCall(conversationData)) {
                 try {
-                    console.log(`📅 Applying sequence tracking for call ${callId}...`);
+                    console.log(`🧠 Triggering Gemini analysis for call ${callId}...`);
+                    const analysis = await this.geminiService.analyzeCall(conversationData.transcript);
                     
-                    // Get call data for sequence calculation
-                    const callData = {
-                        phone_number: conversationData.phone_number || 'unknown',
-                        status: conversationData.status
-                    };
-                    
-                    // Calculate next call time based on analysis
-                    const sequenceData = await this.sequenceManager.calculateNextCallTime(callData, analysisResults);
-                    
-                    // Update call with sequence tracking
-                    await this.sequenceManager.updateSequenceTracking(callId, sequenceData);
-                    console.log(`✅ Sequence tracking applied for call ${callId}`);
-                } catch (sequenceError) {
-                    console.error(`❌ Error applying sequence tracking for ${conversationId}:`, sequenceError.message);
+                    if (analysis) {
+                        await this.storeAnalysisResults(callId, analysis);
+                        console.log(`✅ Gemini analysis completed for call ${callId}`);
+                    }
+                } catch (analysisError) {
+                    console.warn(`⚠️ Gemini analysis failed for call ${callId}:`, analysisError.message);
                 }
             } else {
-                console.log(`⚠️ Skipping sequence tracking - service not available`);
+                console.log(`⏭️ Skipping Gemini analysis for call ${callId}: ${this.getSkipReason(conversationData)}`);
             }
-            */
         } catch (error) {
             console.error(`❌ Error processing detailed conversation ${conversationId}:`, error.message);
+            throw error;
         }
     }
 
@@ -358,14 +384,37 @@ s    }
      * @returns {Object} Database call data
      */
     convertConversationToCallData(conversation, isExternal) {
+        // Compute call_result and answered based on duration and status
+        let call_result = null;
+        let answered = false;
+        
+        if (conversation.status === 'done' && conversation.duration) {
+            if (conversation.duration > 5) {
+                call_result = 'answered';
+                answered = true;
+            } else {
+                call_result = 'unanswered';
+                answered = false;
+            }
+        } else if (conversation.status === 'failed' && conversation.duration) {
+            if (conversation.duration > 5) {
+                call_result = 'answered';
+                answered = true; // Override edge case
+            } else {
+                call_result = 'failed';
+                answered = false;
+            }
+        }
+        
         return {
             phone_number: conversation.to_number || conversation.phone_number || 'unknown',
             elevenlabs_conversation_id: conversation.conversation_id,
-            status: this.mapElevenLabsStatus(conversation.status),
-            call_successful: conversation.call_successful === 'success',
+            status: conversation.status, // Keep raw ElevenLabs status
+            call_result: call_result,
+            answered: answered,
             duration_seconds: conversation.duration || conversation.call_duration_secs || 0,
             message_count: conversation.message_count || 0,
-            start_time: conversation.start_time || null,
+            start_time: conversation.start_time || conversation.created_at,
             call_summary_title: conversation.call_summary_title,
             transcript_summary: conversation.transcript_summary,
             is_external_call: isExternal,
@@ -379,36 +428,40 @@ s    }
      * @returns {Object} Update data
      */
     convertConversationToUpdateData(conversation) {
+        // Compute call_result and answered based on duration and status
+        let call_result = null;
+        let answered = false;
+        
+        if (conversation.status === 'done' && conversation.duration) {
+            if (conversation.duration > 5) {
+                call_result = 'answered';
+                answered = true;
+            } else {
+                call_result = 'unanswered';
+                answered = false;
+            }
+        } else if (conversation.status === 'failed' && conversation.duration) {
+            if (conversation.duration > 5) {
+                call_result = 'answered';
+                answered = true; // Override edge case
+            } else {
+                call_result = 'failed';
+                answered = false;
+            }
+        }
+        
         return {
             phone_number: conversation.to_number || conversation.phone_number,
-            status: this.mapElevenLabsStatus(conversation.status),
-            call_successful: conversation.call_successful === 'success',
+            status: conversation.status, // Keep raw ElevenLabs status
+            call_result: call_result,
+            answered: answered,
             duration_seconds: conversation.duration || conversation.call_duration_secs,
             message_count: conversation.message_count,
-            start_time: conversation.start_time || null,
+            start_time: conversation.start_time || conversation.created_at,
             call_summary_title: conversation.call_summary_title,
             transcript_summary: conversation.transcript_summary,
             updated_at: new Date().toISOString()
         };
-    }
-
-    /**
-     * Map ElevenLabs status to our database status
-     * @param {string} elevenLabsStatus - ElevenLabs status
-     * @returns {string} Our database status
-     */
-    mapElevenLabsStatus(elevenLabsStatus) {
-        switch (elevenLabsStatus) {
-            case 'done':
-                return 'completed';
-            case 'failed':
-                return 'failed';
-            case 'active':
-            case 'in-progress':
-                return 'active';
-            default:
-                return 'unknown';
-        }
     }
 
     /**
@@ -490,7 +543,7 @@ s    }
         }
         
         // Skip if call was unsuccessful
-        if (conversationData.call_successful === 'failure') {
+        if (conversationData.call_result === 'failed') {
             return false;
         }
         
@@ -524,7 +577,7 @@ s    }
             return `duration too short (${conversationData.duration}s)`;
         }
         
-        if (conversationData.call_successful === 'failure') {
+        if (conversationData.call_result === 'failed') {
             return 'call unsuccessful';
         }
         
@@ -553,17 +606,19 @@ s    }
      */
     needsUpdate(existingCall, conversation) {
         // Check if any important fields have changed
-        const newStatus = this.mapElevenLabsStatus(conversation.status);
-        const newSuccessful = conversation.call_successful === 'success';
-        const newDuration = conversation.call_duration_secs || 0;
+        const newStatus = conversation.status; // Keep raw ElevenLabs status
+        const newCallResult = conversation.call_result;
+        const newAnswered = conversation.answered;
+        const newDuration = conversation.duration || conversation.call_duration_secs || 0;
         const newMessageCount = conversation.message_count || 0;
 
         return (
             existingCall.status !== newStatus ||
-            existingCall.call_successful !== newSuccessful ||
+            existingCall.call_result !== newCallResult ||
+            existingCall.answered !== newAnswered ||
             existingCall.duration_seconds !== newDuration ||
             existingCall.message_count !== newMessageCount ||
-            existingCall.call_summary_title !== conversation.call_summary_title
+            existingCall.phone_number !== (conversation.to_number || conversation.phone_number)
         );
     }
 

@@ -108,9 +108,6 @@ class SupabaseDBService {
             if (callData.agent_name) {
                 insertData.agent_name = callData.agent_name;
             }
-            if (callData.call_successful !== undefined) {
-                insertData.call_successful = callData.call_successful;
-            }
             if (callData.call_result) {
                 insertData.call_result = callData.call_result;
             }
@@ -260,6 +257,24 @@ class SupabaseDBService {
             console.error('Error deleting transcriptions:', error.message);
             throw new Error(`Failed to delete transcriptions: ${error.message}`);
         }
+    }
+
+    /**
+     * Create transcriptions (alias for insertTranscriptions)
+     * @param {Array} transcriptionData - Array of transcription objects
+     * @returns {Promise<Array>} Inserted transcription records
+     */
+    async createTranscriptions(transcriptionData) {
+        return this.insertTranscriptions(transcriptionData);
+    }
+
+    /**
+     * Delete transcriptions by call ID (alias for deleteTranscriptionsForCall)
+     * @param {string} callId - Call ID
+     * @returns {Promise<number>} Number of deleted records
+     */
+    async deleteTranscriptionsByCallId(callId) {
+        return this.deleteTranscriptionsForCall(callId);
     }
 
     /**
@@ -779,7 +794,7 @@ class SupabaseDBService {
             // Get basic call statistics
             const { data: calls, error: callsError } = await this.client
                 .from('calls')
-                .select('status, call_successful, duration_seconds, is_external_call');
+                .select('status, call_result, duration_seconds, is_external_call');
 
             if (callsError) throw callsError;
 
@@ -800,7 +815,7 @@ class SupabaseDBService {
                     stats.internal_calls++;
                 }
 
-                if (call.call_successful) {
+                if (call.call_result === 'answered') {
                     stats.successful_calls++;
                 } else {
                     stats.failed_calls++;
