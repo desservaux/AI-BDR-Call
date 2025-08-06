@@ -177,6 +177,19 @@ s    }
                 return result;
             }
 
+            // For final calls, ALWAYS get detailed data first to get phone number
+            console.log(`📞 Fetching detailed data for final call ${conversation.conversation_id}...`);
+            const details = await this.elevenLabsService.getConversationDetailsEnhanced(conversation.conversation_id);
+            
+            if (!details.success) {
+                result.error = 'Failed to get conversation details';
+                return result;
+            }
+            
+            // Now we have the real phone number from details
+            const phoneNumber = details.to_number || 'unknown';
+            console.log(`📞 Phone number for ${conversation.conversation_id}: ${phoneNumber}`);
+
             // Check if conversation already exists in our database
             const existingCall = await this.dbService.getCallByConversationId(conversation.conversation_id);
             
@@ -186,17 +199,19 @@ s    }
                 await this.processDetailedConversation(conversation.conversation_id, existingCall.id);
                 result.is_updated = true;
             } else {
-                // Create minimal row for new final call
+                // Create minimal row for new final call with correct phone number
                 console.log(`📞 Creating minimal call record for ${conversation.conversation_id}...`);
                 
                 const callData = {
                     elevenlabs_conversation_id: conversation.conversation_id,
-                    phone_number: conversation.to_number || conversation.phone_number || 'unknown',
+                    phone_number: phoneNumber, // Now we have the real number!
+                    agent_id: details.agent_id,
+                    agent_name: conversation.agent_name,
                     created_at: new Date().toISOString()
                 };
                 
                 const createdCall = await this.dbService.createCall(callData);
-                console.log(`✅ Created minimal call record: ${createdCall.id}`);
+                console.log(`✅ Created minimal call record: ${createdCall.id} with phone: ${phoneNumber}`);
                 
                 // Immediately process detailed conversation
                 await this.processDetailedConversation(conversation.conversation_id, createdCall.id);
@@ -228,7 +243,16 @@ s    }
                 return;
             }
 
-            // Build consolidatedData: { status_raw, start_time, duration, to_number, message_count, transcript, summaries }
+            // FIRST compute call_result
+            const call_result = this.elevenLabsService.computeOutcomeFrom(conversationData.status_raw, conversationData.duration);
+            
+            // If call_result is null (shouldn't happen here because we only reach this for final calls), abort
+            if (call_result === null) {
+                console.warn(`⚠️ Unexpected null call_result for final call ${conversationId}, aborting`);
+                return;
+            }
+
+            // THEN build consolidatedData with the computed call_result
             const consolidatedData = {
                 status_raw: conversationData.status_raw,
                 start_time: conversationData.start_time,
@@ -237,17 +261,9 @@ s    }
                 message_count: conversationData.message_count,
                 transcript: conversationData.transcript,
                 transcript_summary: conversationData.transcript_summary,
-                call_summary_title: conversationData.call_summary_title
+                call_summary_title: conversationData.call_summary_title,
+                call_result: call_result // Add the computed result
             };
-            
-            // Compute call_result = computeOutcomeFrom(status_raw, duration)
-            const call_result = this.elevenLabsService.computeOutcomeFrom(consolidatedData.status_raw, consolidatedData.duration);
-            
-            // If call_result is null (shouldn't happen here because we only reach this for final calls), abort
-            if (call_result === null) {
-                console.warn(`⚠️ Unexpected null call_result for final call ${conversationId}, aborting`);
-                return;
-            }
             
             // Update call with consolidated data
             const updateData = {
@@ -286,7 +302,7 @@ s    }
                 }
             }
 
-            // Run analysis if conditions are met: duration >= 10, message_count >= 2, call_result !== 'failed'
+            // NOW you can check shouldAnalyzeCall with the correct data including call_result
             if (this.shouldAnalyzeCall(consolidatedData)) {
                 try {
                     console.log(`🧠 Triggering Gemini analysis for call ${callId}...`);
@@ -383,7 +399,10 @@ s    }
      * @returns {boolean} True if call should be analyzed
      */
     shouldAnalyzeCall(conversationData) {
-        // Use consolidatedData.duration >= 10, message_count >= 2, and call_result !== 'failed'
+        // Make sure conversationData has call_result computed
+        if (!conversationData.call_result) {
+            return false;
+        }
         
         // Skip if call duration is too short (less than 10 seconds)
         if (conversationData.duration && conversationData.duration < 10) {
@@ -409,6 +428,10 @@ s    }
      * @returns {string} Reason for skipping
      */
     getSkipReason(conversationData) {
+        if (!conversationData.call_result) {
+            return 'call_result not computed';
+        }
+        
         if (conversationData.duration && conversationData.duration < 10) {
             return `duration too short (${conversationData.duration}s)`;
         }

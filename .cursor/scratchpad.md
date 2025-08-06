@@ -309,11 +309,34 @@ Implement definitive fix for result ranking by date with proper backend ordering
 - ✅ **Filter Parameters**: Use callResult instead of status
 - ✅ **Search Implementation**: Haystack approach for comprehensive search
 
+### 🎯 Phase 22: Critical Call Sync Issues Fix
+
+**Objective**: Fix critical issues in call synchronization system including phone number extraction, analysis timing, and data consistency.
+
+**Current Tasks**:
+- [x] **Task 22.1**: Fix Phone Number Extraction (HIGH PRIORITY) ✅ COMPLETED
+  - Fix processConversation to always fetch details first to get phone number
+  - Remove dependency on list response phone number (always null)
+  - Update phone number path in getConversationDetailsEnhanced
+  - Success Criteria: Phone numbers properly extracted from detailed API response
+
+- [x] **Task 22.2**: Fix Analysis Trigger Timing Bug (HIGH PRIORITY) ✅ COMPLETED
+  - Add computed call_result to consolidatedData before calling shouldAnalyzeCall
+  - Fix timing bug where call_result is checked before being computed
+  - Remove references to unreliable call_successful field
+  - Success Criteria: Analysis trigger uses correct computed call_result
+
+- [x] **Task 22.3**: Clean Up Status Mapping (MEDIUM PRIORITY) ✅ COMPLETED
+  - Simplify frontend status mapping to use backend call_result
+  - Remove redundant duration-based logic in frontend
+  - Ensure consistent use of computeOutcomeFrom throughout system
+  - Success Criteria: Single source of truth for call outcomes
+
 ## Executor's Feedback or Assistance Requests
 
-**Executor Status**: ✅ PHASE 21 COMPLETED - API and Sorting Definitive Fix
+**Executor Status**: ✅ PHASE 22 COMPLETED - Critical Call Sync Issues Fix
 
-**📊 Current System Status**: Production-ready ElevenLabs voice agent system with definitive sorting and rendering
+**📊 Current System Status**: Production-ready ElevenLabs voice agent system with comprehensive call sync fixes
 - ✅ 20 total calls logged with comprehensive metadata
 - ✅ Phone number management with deduplication (12 phone numbers, 14 contacts)
 - ✅ UI/UX improvements with CRM-style design
@@ -321,12 +344,13 @@ Implement definitive fix for result ranking by date with proper backend ordering
 - ✅ ElevenLabs sync data mapping fixes completed
 - ✅ ElevenLabs normalization and outcome computation completed
 - ✅ Sync flow for final calls only with call_result field
-- ✅ **NEW**: Definitive fix for result ranking by date with proper backend ordering
+- ✅ Definitive fix for result ranking by date with proper backend ordering
+- ✅ **NEW**: Critical call sync issues fixed - phone number extraction, analysis timing, status mapping
 
-**🎯 Phase 21 Implementation Details**:
-- ✅ **Task 21.1**: Backend sorting with proper date ranking and fallback
-- ✅ **Task 21.2**: Frontend simplification with backend-driven rendering
-- ✅ **Task 21.3**: Search implementation with haystack approach
+**🎯 Phase 22 Implementation Details**:
+- ✅ **Task 22.1**: Fixed phone number extraction - processConversation now fetches details first
+- ✅ **Task 22.2**: Fixed analysis trigger timing bug - call_result computed before shouldAnalyzeCall
+- ✅ **Task 22.3**: Simplified frontend status mapping - removed redundant duration logic
 
 **🔧 Technical Changes Made**:
 - ✅ Updated getCallsWithAdvancedFilters with proper ordering: start_time desc, created_at desc
@@ -338,6 +362,11 @@ Implement definitive fix for result ranking by date with proper backend ordering
 - ✅ Fixed duration formatting to show minutes and seconds
 - ✅ Implemented haystack search approach for comprehensive search
 - ✅ Updated pagination to use backend data instead of client-side calculations
+- ✅ **NEW**: Fixed processConversation to always fetch details first for phone number extraction
+- ✅ **NEW**: Fixed timing bug - compute call_result before building consolidatedData
+- ✅ **NEW**: Updated shouldAnalyzeCall to check for call_result existence
+- ✅ **NEW**: Simplified mapCallStatus to use backend call_result directly
+- ✅ **NEW**: Enhanced logging for debugging phone number extraction
 
 **📈 Expected Outcomes Achieved**:
 - ✅ Proper date ranking with fallback for null start_time values
@@ -346,6 +375,10 @@ Implement definitive fix for result ranking by date with proper backend ordering
 - ✅ Comprehensive search using haystack approach
 - ✅ Duration formatting shows minutes and seconds
 - ✅ Backend-driven pagination with proper metadata
+- ✅ **NEW**: Phone numbers properly extracted from detailed API response (no more 'unknown' numbers)
+- ✅ **NEW**: Analysis trigger uses computed call_result correctly (timing bug fixed)
+- ✅ **NEW**: Single source of truth for call outcomes (simplified status mapping)
+- ✅ **NEW**: Enhanced debugging and error reporting for sync issues
 
 **Next Steps**: Ready for Phase 4 - Frontend simplification and Phase 5 - Cleanup
 
@@ -381,6 +414,9 @@ Implement definitive fix for result ranking by date with proper backend ordering
 - ✅ **Migration Handling**: For existing data, create phone_numbers entries first, with optional contacts for unknown numbers.
 - ✅ **Sequence Concurrency**: Implement queueing to limit simultaneous calls, preventing overload.
 - ✅ **ElevenLabs Sync**: Remove dependency on external call_successful field, implement own outcome computation.
+- ✅ **Phone Number Extraction**: Always fetch detailed API data for final calls to get accurate phone numbers; list responses may have null values.
+- ✅ **Analysis Timing**: Compute call_result before building consolidatedData to avoid timing bugs in analysis triggers.
+- ✅ **Status Mapping**: Use single source of truth (backend call_result) instead of duplicating duration-based logic in frontend.
 
 ### 🎯 Future Considerations
 
