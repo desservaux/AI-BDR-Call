@@ -1358,9 +1358,9 @@
                     <h3 style="margin-bottom: 15px; color: #333;">Advanced Filters</h3>
                     <div class="filter-grid">
                         <div class="filter-group">
-                            <label for="filter-status">Call Status</label>
-                            <select id="filter-status">
-                                <option value="">All Statuses</option>
+                            <label for="filter-call-result">Call Result</label>
+                            <select id="filter-call-result">
+                                <option value="">All Results</option>
                                 <option value="answered">Answered</option>
                                 <option value="failed">Failed</option>
                                 <option value="unanswered">Unanswered</option>
@@ -1797,7 +1797,7 @@
             }
         }
         
-        // Load calls data with advanced filtering, pagination, and search
+        // Load calls data with advanced filtering and backend pagination
         async function loadCalls(page = 1) {
             try {
                 callsTableContent.innerHTML = '<div class="loading">Loading calls...</div>';
@@ -1807,7 +1807,7 @@
                 
                 // Build query string
                 const queryParams = new URLSearchParams();
-                if (filters.status) queryParams.append('status', filters.status);
+                if (filters.callResult) queryParams.append('callResult', filters.callResult);
                 if (filters.phone) queryParams.append('phone', filters.phone);
                 if (filters.dateStart) queryParams.append('dateStart', filters.dateStart);
                 if (filters.dateEnd) queryParams.append('dateEnd', filters.dateEnd);
@@ -1828,32 +1828,31 @@
                 
                 if (data.success) {
                     allCalls = data.calls || [];
-                    totalCalls = data.total || allCalls.length;
+                    totalCalls = data.total || 0;
                     currentPage = data.page || page;
+                    const totalPages = data.totalPages || Math.ceil(totalCalls / itemsPerPage);
                     
                     // Apply search filter if search term exists
                     if (searchTerm) {
-                        filteredCalls = allCalls.filter(call => 
-                            call.phone_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            call.enhanced_status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            call.status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            (call.meeting_booked && 'meeting booked'.includes(searchTerm.toLowerCase())) ||
-                            (call.person_interested && 'interested'.includes(searchTerm.toLowerCase())) ||
-                            (call.person_very_upset && 'upset'.includes(searchTerm.toLowerCase()))
-                        );
+                        filteredCalls = allCalls.filter(call => {
+                            // Build a single tokenized haystack string per row
+                            const haystack = [
+                                call.phone_number,
+                                call.enhanced_status, // same as call_result
+                                call.meeting_booked ? 'meeting booked' : '',
+                                call.person_interested ? 'interested' : '',
+                                call.person_very_upset ? 'upset' : ''
+                            ].join(' ').toLowerCase();
+                            
+                            return haystack.includes(searchTerm.toLowerCase());
+                        });
                     } else {
                         filteredCalls = allCalls;
                     }
                     
-                    // Reset current page if it's beyond the available pages for filtered results
-                    const totalPages = Math.ceil(filteredCalls.length / itemsPerPage);
-                    if (currentPage > totalPages && totalPages > 0) {
-                        currentPage = 1;
-                    }
-                    
                     if (filteredCalls.length > 0) {
                         displayCalls(filteredCalls);
-                        updatePagination();
+                        updatePaginationWithBackendData(totalPages, totalCalls);
                     } else {
                         callsTableContent.innerHTML = '<div class="no-data">No calls found</div>';
                         hidePagination();
@@ -1872,7 +1871,7 @@
         // Get active filter values
         function getActiveFilters() {
             return {
-                status: document.getElementById('filter-status').value,
+                callResult: document.getElementById('filter-call-result').value,
                 phone: document.getElementById('filter-phone').value,
                 dateStart: document.getElementById('filter-date-start').value,
                 dateEnd: document.getElementById('filter-date-end').value,
@@ -1885,7 +1884,7 @@
         
         // Clear all filters
         function clearAllFilters() {
-            document.getElementById('filter-status').value = '';
+            document.getElementById('filter-call-result').value = '';
             document.getElementById('filter-phone').value = '';
             document.getElementById('filter-date-start').value = '';
             document.getElementById('filter-date-end').value = '';
@@ -1895,12 +1894,8 @@
             document.getElementById('filter-duration').value = '';
         }
         
-        // Display calls in table with pagination info
+        // Display calls in table - render in order received from backend
         function displayCalls(calls) {
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const endIndex = startIndex + itemsPerPage;
-            const pageCalls = calls.slice(startIndex, endIndex);
-            
             const tableHTML = `
                 <div class="call-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto; font-weight: 600; background: #f8f9fa;">
                     <div>Phone Number</div>
@@ -1910,27 +1905,31 @@
                     <div>Analysis</div>
                     <div>Actions</div>
                 </div>
-                ${pageCalls.map(call => `
-                    <div class="call-row">
-                        <div class="call-phone">${call.phone_number && call.phone_number !== 'unknown' ? call.phone_number : 'N/A'}</div>
-                        <div class="call-date">${call.start_time ? new Date(call.start_time).toLocaleString() : new Date(call.created_at).toLocaleString()}</div>
-                        <div class="call-status-badge status-${call.enhanced_status || call.status || 'unknown'}">${call.enhanced_status || call.status || 'Unknown'}</div>
-                        <div class="call-duration">${call.duration_seconds ? Math.round(call.duration_seconds / 60) + 'm' : 'N/A'}</div>
-                        <div class="call-analysis">
-                            ${call.meeting_booked ? '✅' : '❌'} Meeting
-                            ${call.person_interested ? '✅' : '❌'} Interested
+                ${calls.map(call => {
+                    // Duration formatting: minutes = Math.floor(duration_seconds/60), seconds = duration_seconds % 60
+                    const minutes = call.duration_seconds ? Math.floor(call.duration_seconds / 60) : 0;
+                    const seconds = call.duration_seconds ? call.duration_seconds % 60 : 0;
+                    const durationText = call.duration_seconds ? `${minutes}m ${seconds}s` : 'N/A';
+                    
+                    return `
+                        <div class="call-row">
+                            <div class="call-phone">${call.phone_number && call.phone_number !== 'unknown' ? call.phone_number : 'N/A'}</div>
+                            <div class="call-date">${call.start_time ? new Date(call.start_time).toLocaleString() : new Date(call.created_at).toLocaleString()}</div>
+                            <div class="call-status-badge status-${call.enhanced_status || 'unknown'}">${call.enhanced_status || 'Unknown'}</div>
+                            <div class="call-duration">${durationText}</div>
+                            <div class="call-analysis">
+                                ${call.meeting_booked ? '✅' : '❌'} Meeting
+                                ${call.person_interested ? '✅' : '❌'} Interested
+                            </div>
+                            <div class="call-actions">
+                                <button class="btn btn-small btn-secondary" onclick="viewCallDetails('${call.id}')">View</button>
+                            </div>
                         </div>
-                        <div class="call-actions">
-                            <button class="btn btn-small btn-secondary" onclick="viewCallDetails('${call.id}')">View</button>
-                        </div>
-                    </div>
-                `).join('')}
+                    `;
+                }).join('')}
             `;
             
             callsTableContent.innerHTML = tableHTML;
-            
-            // Update counts and pagination info
-            updateCallCounts(calls.length);
         }
         
         // Update call counts and pagination info
@@ -1963,7 +1962,51 @@
             }
         }
         
-        // Update pagination controls
+        // Update pagination controls with backend data
+        function updatePaginationWithBackendData(totalPages, totalCalls) {
+            const paginationControls = document.getElementById('pagination-controls');
+            const pageNumbers = document.getElementById('page-numbers');
+            const prevBtn = document.getElementById('prev-page-btn');
+            const nextBtn = document.getElementById('next-page-btn');
+            const paginationInfo = document.getElementById('pagination-info');
+            
+            if (totalPages <= 1) {
+                hidePagination();
+                return;
+            }
+            
+            paginationControls.style.display = 'flex';
+            
+            // Update previous/next buttons
+            prevBtn.disabled = currentPage <= 1;
+            nextBtn.disabled = currentPage >= totalPages;
+            
+            // Update pagination info
+            if (paginationInfo) {
+                const startIndex = (currentPage - 1) * itemsPerPage + 1;
+                const endIndex = Math.min(currentPage * itemsPerPage, totalCalls);
+                paginationInfo.textContent = `Showing ${startIndex}-${endIndex} of ${totalCalls}`;
+            }
+            
+            // Generate page numbers
+            let pageNumbersHTML = '';
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const isActive = i === currentPage;
+                pageNumbersHTML += `<button class="page-number ${isActive ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+            
+            pageNumbers.innerHTML = pageNumbersHTML;
+        }
+        
+        // Update pagination controls (legacy function for search)
         function updatePagination() {
             const totalPages = Math.ceil(filteredCalls.length / itemsPerPage);
             const paginationControls = document.getElementById('pagination-controls');
@@ -2011,8 +2054,7 @@
         // Go to specific page
         function goToPage(page) {
             currentPage = page;
-            displayCalls(filteredCalls);
-            updatePagination();
+            loadCalls(page); // Use backend pagination
         }
         
         // Search functionality
@@ -2022,16 +2064,20 @@
             currentPage = 1; // Reset to first page when searching
             
             if (allCalls.length > 0) {
-                // Apply search filter
+                // Apply search filter using haystack approach
                 if (searchTerm) {
-                    filteredCalls = allCalls.filter(call => 
-                        call.phone_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        call.enhanced_status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        call.status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (call.meeting_booked && 'meeting booked'.includes(searchTerm.toLowerCase())) ||
-                        (call.person_interested && 'interested'.includes(searchTerm.toLowerCase())) ||
-                        (call.person_very_upset && 'upset'.includes(searchTerm.toLowerCase()))
-                    );
+                    filteredCalls = allCalls.filter(call => {
+                        // Build a single tokenized haystack string per row
+                        const haystack = [
+                            call.phone_number,
+                            call.enhanced_status, // same as call_result
+                            call.meeting_booked ? 'meeting booked' : '',
+                            call.person_interested ? 'interested' : '',
+                            call.person_very_upset ? 'upset' : ''
+                        ].join(' ').toLowerCase();
+                        
+                        return haystack.includes(searchTerm.toLowerCase());
+                    });
                 } else {
                     filteredCalls = allCalls;
                 }

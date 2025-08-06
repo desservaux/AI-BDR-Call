@@ -405,6 +405,7 @@ class SupabaseDBService {
             let query = this.client
                 .from('calls_with_analysis')
                 .select('*')
+                .order('start_time', { ascending: false })
                 .order('created_at', { ascending: false });
 
             // Apply basic filters
@@ -494,11 +495,16 @@ class SupabaseDBService {
 
             if (error) throw error;
 
+            // Node.js sort fallback to ensure proper date ranking
+            const sortedCalls = (calls || []).sort((a, b) => 
+                new Date(b.start_time || b.created_at) - new Date(a.start_time || a.created_at)
+            );
+
             // If we have analysis filters, we need to filter by analysis data
             if (filters.meetingBooked || filters.personInterested || filters.personUpset) {
                 const filteredCalls = [];
 
-                for (const call of calls) {
+                for (const call of sortedCalls) {
                     try {
                         const analysis = await this.getBookingAnalysisByCallId(call.id);
                         
@@ -546,8 +552,8 @@ class SupabaseDBService {
             }
 
             return {
-                calls: calls || [],
-                total: calls ? calls.length : 0
+                calls: sortedCalls,
+                total: sortedCalls.length
             };
         } catch (error) {
             console.error('Error getting calls with advanced filters:', error.message);

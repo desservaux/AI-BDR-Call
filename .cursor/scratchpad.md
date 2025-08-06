@@ -22,8 +22,11 @@
 **NEXT OBJECTIVE**: ✅ Phase 19 - ElevenLabs Normalization and Outcome Computation COMPLETED
 Successfully implemented comprehensive normalization of ElevenLabs API data and outcome computation based on call_result field only. All data extraction now uses documented ElevenLabs API fields and the computeOutcomeFrom function is fully implemented and tested.
 
-**NEXT OBJECTIVE**: 🎯 Phase 20 - Sync Flow for Final Calls Only
-Implement sync flow that only persists final calls with call_result, removing dependency on status and answered fields.
+**NEXT OBJECTIVE**: ✅ Phase 20 - Sync Flow for Final Calls Only COMPLETED
+Successfully implemented sync flow that only persists final calls with call_result, removing dependency on status and answered fields.
+
+**NEXT OBJECTIVE**: 🎯 Phase 21 - API and Sorting Definitive Fix
+Implement definitive fix for result ranking by date with proper backend ordering and frontend rendering.
 
 ## Key Challenges and Analysis
 
@@ -62,28 +65,51 @@ Implement sync flow that only persists final calls with call_result, removing de
 - ✅ **Transcript Handling**: Proper fallback strategies for transcript data
 - ✅ **Phone Number Extraction**: Found best documented location for to_number
 
-### 🎯 CURRENT CHALLENGE: Sync Flow for Final Calls Only
+### ✅ RESOLVED: Sync Flow for Final Calls Only
 
-**Objective**: Implement sync flow that only persists final calls with call_result, removing dependency on status and answered fields.
+**Objective**: ✅ Implement sync flow that only persists final calls with call_result, removing dependency on status and answered fields.
+
+**Key Requirements Completed**:
+1. **CallSyncService.processConversation()**: ✅ Updated
+   - ✅ If status_raw in ['initiated','in-progress','processing'] → skip early; do not persist anything
+   - ✅ For status_raw in ['done','failed']: create minimal row or process existing call
+   - ✅ Immediately call processDetailedConversation() for all final calls
+
+2. **CallSyncService.processDetailedConversation()**: ✅ Updated
+   - ✅ Fetch enhanced details; build consolidatedData with all required fields
+   - ✅ Compute call_result = computeOutcomeFrom(status_raw, duration)
+   - ✅ Update call with only call_result (not status or answered)
+   - ✅ Replace transcriptions: delete by call_id; insert mapped transcript
+   - ✅ Run analysis with new criteria: duration >= 10, message_count >= 2, call_result !== 'failed'
+
+**Critical Issues Resolved**:
+- ✅ **Final Call Filtering**: Only process calls with status 'done' or 'failed'
+- ✅ **Minimal Row Creation**: Create minimal rows for new final calls
+- ✅ **Outcome Computation**: Use only call_result field, remove answered dependency
+- ✅ **Analysis Criteria**: Updated analysis conditions to use new criteria
+
+### 🎯 CURRENT CHALLENGE: API and Sorting Definitive Fix
+
+**Objective**: Implement definitive fix for result ranking by date with proper backend ordering and frontend rendering.
 
 **Key Requirements**:
-1. **CallSyncService.processConversation()**: 
-   - If status_raw in ['initiated','in-progress','processing'] → skip early; do not persist anything
-   - For status_raw in ['done','failed']: create minimal row or process existing call
-   - Immediately call processDetailedConversation() for all final calls
+1. **Backend Sorting**: 
+   - Chain orders: `.order('start_time', { ascending: false }).order('created_at', { ascending: false })`
+   - Node.js sort fallback: `calls.sort((a,b) => new Date(b.start_time || b.created_at) - new Date(a.start_time || a.created_at))`
 
-2. **CallSyncService.processDetailedConversation()**:
-   - Fetch enhanced details; build consolidatedData with all required fields
-   - Compute call_result = computeOutcomeFrom(status_raw, duration)
-   - Update call with only call_result (not status or answered)
-   - Replace transcriptions: delete by call_id; insert mapped transcript
-   - Run analysis with new criteria: duration >= 10, message_count >= 2, call_result !== 'failed'
+2. **Frontend Rendering**:
+   - Don't sort; render in order received from backend
+   - Ensure pagination matches backend
+   - Use callResult parameter instead of status for filtering
+   - Only show badges for answered/unanswered/failed
+   - Fix duration formatting: minutes and seconds
+   - Build haystack search: `[phone_number, enhanced_status, meeting_booked, person_interested, person_very_upset].join(' ')`
 
 **Critical Issues to Address**:
-- **Final Call Filtering**: Only process calls with status 'done' or 'failed'
-- **Minimal Row Creation**: Create minimal rows for new final calls
-- **Outcome Computation**: Use only call_result field, remove answered dependency
-- **Analysis Criteria**: Update analysis conditions to use new criteria
+- **Backend Ordering**: Proper date ranking with fallback for null start_time
+- **Frontend Simplification**: Remove client-side sorting and slicing
+- **Filter Parameters**: Use callResult instead of status
+- **Search Implementation**: Haystack approach for comprehensive search
 
 ## High-level Task Breakdown
 
@@ -135,7 +161,7 @@ Implement sync flow that only persists final calls with call_result, removing de
   - **Implementation**: Updated call-sync.js to use computeOutcomeFrom function in all methods
   - **Final Status**: ✅ All call processing now uses new outcome computation
 
-### 🎯 Phase 20: Sync Flow for Final Calls Only
+### ✅ COMPLETED: Phase 20 - Sync Flow for Final Calls Only
 
 - [x] **Task 20.1**: Update processConversation Method (HIGH PRIORITY) ✅ COMPLETED
   - **Priority**: HIGH - Core sync flow logic
@@ -171,11 +197,45 @@ Implement sync flow that only persists final calls with call_result, removing de
   - **Implementation**: Removed unused methods and cleaned up answered field references
   - **Final Status**: ✅ Codebase cleaned up with only call_result field usage
 
+### 🎯 Phase 21: API and Sorting Definitive Fix
+
+- [x] **Task 21.1**: Backend Sorting Implementation (HIGH PRIORITY) ✅ COMPLETED
+  - **Priority**: HIGH - Proper date ranking
+  - **Requirements**:
+    - Chain orders: `.order('start_time', { ascending: false }).order('created_at', { ascending: false })`
+    - Node.js sort fallback: `calls.sort((a,b) => new Date(b.start_time || b.created_at) - new Date(a.start_time || a.created_at))`
+    - Update API to use callResult parameter instead of status
+  - **Success Criteria**: Proper date ranking with fallback for null start_time
+  - **Implementation**: Updated getCallsWithAdvancedFilters with proper ordering and sort fallback
+  - **Final Status**: ✅ Backend sorting with proper date ranking implemented
+
+- [x] **Task 21.2**: Frontend Rendering Simplification (HIGH PRIORITY) ✅ COMPLETED
+  - **Priority**: HIGH - Remove client-side sorting and slicing
+  - **Requirements**:
+    - Don't sort; render in order received from backend
+    - Use callResult parameter instead of status for filtering
+    - Only show badges for answered/unanswered/failed
+    - Fix duration formatting: minutes and seconds
+    - Remove client-side pagination slicing
+  - **Success Criteria**: Frontend renders in order received from backend
+  - **Implementation**: Updated displayCalls function and filter parameters
+  - **Final Status**: ✅ Frontend simplified with backend-driven rendering
+
+- [x] **Task 21.3**: Search Implementation with Haystack (MEDIUM PRIORITY) ✅ COMPLETED
+  - **Priority**: MEDIUM - Comprehensive search functionality
+  - **Requirements**:
+    - Build haystack search: `[phone_number, enhanced_status, meeting_booked, person_interested, person_very_upset].join(' ')`
+    - Update search to use haystack approach
+    - Ensure search works with enhanced_status field
+  - **Success Criteria**: Comprehensive search using haystack approach
+  - **Implementation**: Updated search function with haystack implementation
+  - **Final Status**: ✅ Search implemented with haystack approach
+
 ## Project Status Board
 
-### ✅ COMPLETED: Full System Implementation (Phases 1-20)
+### ✅ COMPLETED: Full System Implementation (Phases 1-21)
 
-**System Status**: ✅ Production-ready ElevenLabs voice agent with comprehensive sync flow
+**System Status**: ✅ Production-ready ElevenLabs voice agent with definitive sorting and rendering
 - ✅ Server running on port 3000 | ElevenLabs integration | Dashboard with 6 chart types
 - ✅ Call details with transcripts | Analytics & filtering | Pagination & search
 - ✅ Contacts & phone number management | Sequence automation | CSV/Excel imports
@@ -183,6 +243,7 @@ Implement sync flow that only persists final calls with call_result, removing de
 - ✅ ElevenLabs sync data mapping fixes with streamlined outcome computation
 - ✅ ElevenLabs normalization and outcome computation with pure functions
 - ✅ Sync flow for final calls only with call_result field
+- ✅ **NEW**: Definitive fix for result ranking by date with proper backend ordering
 
 ### ✅ COMPLETED: Phase 20 - Sync Flow for Final Calls Only
 
@@ -217,39 +278,76 @@ Implement sync flow that only persists final calls with call_result, removing de
 - ✅ **Outcome Computation**: Use only call_result field, remove answered dependency
 - ✅ **Analysis Criteria**: Updated analysis conditions to use new criteria
 
+### ✅ COMPLETED: Phase 21 - API and Sorting Definitive Fix
+
+**Objective**: ✅ Implement definitive fix for result ranking by date with proper backend ordering and frontend rendering.
+
+**Current Tasks**:
+- [x] **Task 21.1**: Backend Sorting Implementation (HIGH PRIORITY) ✅ COMPLETED
+  - Chain orders: `.order('start_time', { ascending: false }).order('created_at', { ascending: false })`
+  - Node.js sort fallback: `calls.sort((a,b) => new Date(b.start_time || b.created_at) - new Date(a.start_time || a.created_at))`
+  - Update API to use callResult parameter instead of status
+  - Success Criteria: Proper date ranking with fallback for null start_time
+
+- [x] **Task 21.2**: Frontend Rendering Simplification (HIGH PRIORITY) ✅ COMPLETED
+  - Don't sort; render in order received from backend
+  - Use callResult parameter instead of status for filtering
+  - Only show badges for answered/unanswered/failed
+  - Fix duration formatting: minutes and seconds
+  - Remove client-side pagination slicing
+  - Success Criteria: Frontend renders in order received from backend
+
+- [x] **Task 21.3**: Search Implementation with Haystack (MEDIUM PRIORITY) ✅ COMPLETED
+  - Build haystack search: `[phone_number, enhanced_status, meeting_booked, person_interested, person_very_upset].join(' ')`
+  - Update search to use haystack approach
+  - Ensure search works with enhanced_status field
+  - Success Criteria: Comprehensive search using haystack approach
+
+**CRITICAL REQUIREMENTS COMPLETED**:
+- ✅ **Backend Ordering**: Proper date ranking with fallback for null start_time
+- ✅ **Frontend Simplification**: Remove client-side sorting and slicing
+- ✅ **Filter Parameters**: Use callResult instead of status
+- ✅ **Search Implementation**: Haystack approach for comprehensive search
+
 ## Executor's Feedback or Assistance Requests
 
-**Executor Status**: ✅ PHASE 20 COMPLETED - Sync Flow for Final Calls Only
+**Executor Status**: ✅ PHASE 21 COMPLETED - API and Sorting Definitive Fix
 
-**📊 Current System Status**: Production-ready ElevenLabs voice agent system with comprehensive sync flow
+**📊 Current System Status**: Production-ready ElevenLabs voice agent system with definitive sorting and rendering
 - ✅ 20 total calls logged with comprehensive metadata
 - ✅ Phone number management with deduplication (12 phone numbers, 14 contacts)
 - ✅ UI/UX improvements with CRM-style design
 - ✅ Automatic call linking and import validation working
 - ✅ ElevenLabs sync data mapping fixes completed
 - ✅ ElevenLabs normalization and outcome computation completed
-- ✅ **NEW**: Complete implementation of sync flow for final calls only
+- ✅ Sync flow for final calls only with call_result field
+- ✅ **NEW**: Definitive fix for result ranking by date with proper backend ordering
 
-**🎯 Phase 20 Implementation Details**:
-- ✅ **Task 20.1**: Updated processConversation method with new sync flow logic
-- ✅ **Task 20.2**: Updated processDetailedConversation method with proper outcome computation
-- ✅ **Task 20.3**: Cleaned up unused methods and removed answered field dependencies
+**🎯 Phase 21 Implementation Details**:
+- ✅ **Task 21.1**: Backend sorting with proper date ranking and fallback
+- ✅ **Task 21.2**: Frontend simplification with backend-driven rendering
+- ✅ **Task 21.3**: Search implementation with haystack approach
 
 **🔧 Technical Changes Made**:
-- ✅ Updated processConversation() to skip non-final calls and create minimal rows
-- ✅ Updated processDetailedConversation() to use only call_result field
-- ✅ Removed convertConversationToCallData and convertConversationToUpdateData methods
-- ✅ Removed answered field writes and references throughout codebase
-- ✅ Updated analysis criteria to use new conditions: duration >= 10, message_count >= 2, call_result !== 'failed'
-- ✅ Updated needsUpdate method to remove answered field dependency
+- ✅ Updated getCallsWithAdvancedFilters with proper ordering: start_time desc, created_at desc
+- ✅ Added Node.js sort fallback for null start_time values
+- ✅ Updated API to use callResult parameter instead of status
+- ✅ Updated frontend filter to use callResult instead of status
+- ✅ Removed client-side sorting and pagination slicing
+- ✅ Updated displayCalls to render in order received from backend
+- ✅ Fixed duration formatting to show minutes and seconds
+- ✅ Implemented haystack search approach for comprehensive search
+- ✅ Updated pagination to use backend data instead of client-side calculations
 
 **📈 Expected Outcomes Achieved**:
-- ✅ Only final calls (done/failed) are persisted with minimal data
-- ✅ All final calls processed with detailed data and proper outcome computation
-- ✅ Clean codebase with only call_result field usage
-- ✅ Proper analysis criteria based on duration, message count, and call_result
+- ✅ Proper date ranking with fallback for null start_time values
+- ✅ Frontend renders in order received from backend (no client-side sorting)
+- ✅ Filter parameters use callResult instead of status
+- ✅ Comprehensive search using haystack approach
+- ✅ Duration formatting shows minutes and seconds
+- ✅ Backend-driven pagination with proper metadata
 
-**Next Steps**: Ready for Phase 3 - API and sorting implementation
+**Next Steps**: Ready for Phase 4 - Frontend simplification and Phase 5 - Cleanup
 
 ## Design Analysis and Recommendations
 

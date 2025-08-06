@@ -223,6 +223,7 @@ app.get('/api/calls', async (req, res) => {
     try {
         const { 
             status, 
+            callResult,
             phone, 
             dateStart, 
             dateEnd, 
@@ -234,11 +235,12 @@ app.get('/api/calls', async (req, res) => {
             limit = 20
         } = req.query;
         
-        console.log(`📊 Fetching calls with advanced filters: status=${status}, phone=${phone}, dateStart=${dateStart}, dateEnd=${dateEnd}, meetingBooked=${meetingBooked}, personInterested=${personInterested}, personUpset=${personUpset}, duration=${duration}, page=${page}, limit=${limit}`);
+        console.log(`📊 Fetching calls with advanced filters: status=${status}, callResult=${callResult}, phone=${phone}, dateStart=${dateStart}, dateEnd=${dateEnd}, meetingBooked=${meetingBooked}, personInterested=${personInterested}, personUpset=${personUpset}, duration=${duration}, page=${page}, limit=${limit}`);
         
         // Get calls from database with advanced filtering
         const result = await supabaseDb.getCallsWithAdvancedFilters({
             status: status || null,
+            callResult: callResult || null,
             phone: phone || null,
             dateStart: dateStart || null,
             dateEnd: dateEnd || null,
