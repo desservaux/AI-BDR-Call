@@ -1913,7 +1913,7 @@
                 ${pageCalls.map(call => `
                     <div class="call-row">
                         <div class="call-phone">${call.phone_number && call.phone_number !== 'unknown' ? call.phone_number : 'N/A'}</div>
-                        <div class="call-date">${call.start_time ? new Date(call.start_time).toLocaleString() : new Date(call.created_at).toLocaleString()}</div>
+                        <div class="call-date">${call.start_time ? new Date(call.start_time).toLocaleString() : (call.created_at ? new Date(call.created_at).toLocaleString() : 'N/A')}</div>
                         <div class="call-status-badge status-${call.enhanced_status || call.status || 'unknown'}">${call.enhanced_status || call.status || 'Unknown'}</div>
                         <div class="call-duration">${call.duration_seconds ? Math.round(call.duration_seconds / 60) + 'm' : 'N/A'}</div>
                         <div class="call-analysis">
@@ -2420,7 +2420,7 @@
                         </div>
                         <div class="call-detail-item">
                             <div class="call-detail-label">Start Time</div>
-                            <div class="call-detail-value">${call.start_time ? new Date(call.start_time).toLocaleString() : 'N/A'}</div>
+                            <div class="call-detail-value">${call.start_time ? new Date(call.start_time).toLocaleString() : (call.created_at ? new Date(call.created_at).toLocaleString() : 'N/A')}</div>
                         </div>
                         <div class="call-detail-item">
                             <div class="call-detail-label">Created</div>
@@ -2994,7 +2994,7 @@
             const callsHtml = calls.length > 0 ? calls.map(call => {
                 const statusClass = getStatusClass(call.status);
                 const statusText = getStatusText(call.status);
-                const date = new Date(call.created_at).toLocaleString();
+                const date = call.start_time ? new Date(call.start_time).toLocaleString() : new Date(call.created_at).toLocaleString();
                 const duration = call.duration_seconds ? 
                     `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s` : 'N/A';
                 

@@ -1,0 +1,156 @@
+🔍 Checking call filtering logic...
+✅ ElevenLabs service initialized successfully. Found undefined agents.
+📋 Fetching all conversations from ElevenLabs...
+✅ Retrieved 20 conversations
+📊 Total conversations available: unknown
+
+📊 Analyzing 20 conversations for filtering:
+================================================================================
+❌ INVALID: conv_8601k1x8qbxqf9mtzzxps2y1j99x - Status: initiated (incomplete call)
+✅ VALID: conv_9901k1tganggfqr84q5g8kq94n7d - done, Duration: 16s
+✅ VALID: conv_9501k1tg831fep2vxf5e9hxkmxa0 - done, Duration: 9s
+✅ VALID: conv_8301k1tg6wzsf5avefs0yafjntky - done, Duration: 16s
+✅ VALID: conv_9601k1tfjhrqfg28tm1y7bnp95y3 - failed, Duration: 0s
+✅ VALID: conv_3201k1tf552hfa0s6fgtbzt27vad - failed, Duration: 0s
+✅ VALID: conv_3901k1rtpp53ejhs7zkxyb3k800s - done, Duration: 230s
+✅ VALID: conv_9201k1rq3qref7bvgwp8bvbh8fjr - done, Duration: 9s
+✅ VALID: conv_9701k1rpyr8fezr96mf537pz1nm1 - failed, Duration: 26s
+✅ VALID: conv_8301k1rpscceerztse2ajt59y6nf - done, Duration: 5s
+✅ VALID: conv_0001k1rpsbctfgbvc1k0bz7a7rhb - done, Duration: 13s
+✅ VALID: conv_6501k1r745n8fqc9nxqstgdw6jea - done, Duration: 17s
+✅ VALID: conv_1601k1r6rzwve7y9dqsmxnwzc1xa - done, Duration: 76s
+✅ VALID: conv_4201k1qnr4gbeqfsbwgpfz0t2a6f - done, Duration: 128s
+✅ VALID: conv_2801k1qmwg6kema9kxv5z63732ne - done, Duration: 13s
+✅ VALID: conv_01jzrhfh0deadrw5rdq12fydbt - done, Duration: 230s
+✅ VALID: conv_01jzrgg19ked4bhsnefx0hedxk - done, Duration: 51s
+✅ VALID: conv_01jzr61rgtebg9d52z6ed4z0bc - done, Duration: 63s
+✅ VALID: conv_01jzr5jpa3e8pt2sr43s3vc7p8 - done, Duration: 25s
+✅ VALID: conv_01jzr5j600fg49jfcnpjdw3thw - done, Duration: 10s
+
+📊 Filtering Summary:
+Total conversations: 20
+Valid calls: 19
+Invalid calls: 1
+
+🔍 Detailed analysis of potentially problematic calls:
+================================================================================
+conv_8601k1x8qbxqf9mtzzxps2y1j99x:
+  Status: initiated
+  Phone: N/A
+  Duration: 0s
+  Call Successful: unknown
+  ---
+conv_9901k1tganggfqr84q5g8kq94n7d:
+  Status: done
+  Phone: N/A
+  Duration: 16s
+  Call Successful: failure
+  ---
+conv_9501k1tg831fep2vxf5e9hxkmxa0:
+  Status: done
+  Phone: N/A
+  Duration: 9s
+  Call Successful: failure
+  ---
+conv_8301k1tg6wzsf5avefs0yafjntky:
+  Status: done
+  Phone: N/A
+  Duration: 16s
+  Call Successful: failure
+  ---
+conv_9601k1tfjhrqfg28tm1y7bnp95y3:
+  Status: failed
+  Phone: N/A
+  Duration: 0s
+  Call Successful: unknown
+  ---
+conv_3201k1tf552hfa0s6fgtbzt27vad:
+  Status: failed
+  Phone: N/A
+  Duration: 0s
+  Call Successful: unknown
+  ---
+conv_3901k1rtpp53ejhs7zkxyb3k800s:
+  Status: done
+  Phone: N/A
+  Duration: 230s
+  Call Successful: success
+  ---
+conv_9201k1rq3qref7bvgwp8bvbh8fjr:
+  Status: done
+  Phone: N/A
+  Duration: 9s
+  Call Successful: unknown
+  ---
+conv_9701k1rpyr8fezr96mf537pz1nm1:
+  Status: failed
+  Phone: N/A
+  Duration: 26s
+  Call Successful: failure
+  ---
+conv_8301k1rpscceerztse2ajt59y6nf:
+  Status: done
+  Phone: N/A
+  Duration: 5s
+  Call Successful: unknown
+  ---
+conv_0001k1rpsbctfgbvc1k0bz7a7rhb:
+  Status: done
+  Phone: N/A
+  Duration: 13s
+  Call Successful: failure
+  ---
+conv_6501k1r745n8fqc9nxqstgdw6jea:
+  Status: done
+  Phone: N/A
+  Duration: 17s
+  Call Successful: success
+  ---
+conv_1601k1r6rzwve7y9dqsmxnwzc1xa:
+  Status: done
+  Phone: N/A
+  Duration: 76s
+  Call Successful: success
+  ---
+conv_4201k1qnr4gbeqfsbwgpfz0t2a6f:
+  Status: done
+  Phone: N/A
+  Duration: 128s
+  Call Successful: success
+  ---
+conv_2801k1qmwg6kema9kxv5z63732ne:
+  Status: done
+  Phone: N/A
+  Duration: 13s
+  Call Successful: success
+  ---
+conv_01jzrhfh0deadrw5rdq12fydbt:
+  Status: done
+  Phone: N/A
+  Duration: 230s
+  Call Successful: success
+  ---
+conv_01jzrgg19ked4bhsnefx0hedxk:
+  Status: done
+  Phone: N/A
+  Duration: 51s
+  Call Successful: success
+  ---
+conv_01jzr61rgtebg9d52z6ed4z0bc:
+  Status: done
+  Phone: N/A
+  Duration: 63s
+  Call Successful: success
+  ---
+conv_01jzr5jpa3e8pt2sr43s3vc7p8:
+  Status: done
+  Phone: N/A
+  Duration: 25s
+  Call Successful: success
+  ---
+conv_01jzr5j600fg49jfcnpjdw3thw:
+  Status: done
+  Phone: N/A
+  Duration: 10s
+  Call Successful: success
+  ---

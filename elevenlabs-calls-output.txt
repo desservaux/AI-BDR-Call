@@ -1,0 +1,236 @@
+🔍 Checking ElevenLabs conversations...
+✅ ElevenLabs service initialized successfully. Found undefined agents.
+📋 Fetching all conversations from ElevenLabs...
+✅ Retrieved 20 conversations
+📊 Total conversations available: unknown
+
+📊 Found 20 conversations in ElevenLabs:
+================================================================================
+1. Conversation ID: conv_8601k1x8qbxqf9mtzzxps2y1j99x
+   Status: initiated
+   Duration: 0s
+   Start Time: 2025-08-05T14:03:51.000Z
+   Call Successful: unknown
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: N/A
+   ------------------------------------------------------------
+2. Conversation ID: conv_9901k1tganggfqr84q5g8kq94n7d
+   Status: done
+   Duration: 16s
+   Start Time: 2025-08-04T12:19:07.000Z
+   Call Successful: failure
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: Voicemail Detection Success
+   ------------------------------------------------------------
+3. Conversation ID: conv_9501k1tg831fep2vxf5e9hxkmxa0
+   Status: done
+   Duration: 9s
+   Start Time: 2025-08-04T12:17:59.000Z
+   Call Successful: failure
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: French voicemail detection
+   ------------------------------------------------------------
+4. Conversation ID: conv_8301k1tg6wzsf5avefs0yafjntky
+   Status: done
+   Duration: 16s
+   Start Time: 2025-08-04T12:17:15.000Z
+   Call Successful: failure
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: Voicemail Detection
+   ------------------------------------------------------------
+5. Conversation ID: conv_9601k1tfjhrqfg28tm1y7bnp95y3
+   Status: failed
+   Duration: 0s
+   Start Time: 2025-08-04T12:05:50.000Z
+   Call Successful: unknown
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: N/A
+   ------------------------------------------------------------
+6. Conversation ID: conv_3201k1tf552hfa0s6fgtbzt27vad
+   Status: failed
+   Duration: 0s
+   Start Time: 2025-08-04T11:58:31.000Z
+   Call Successful: unknown
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: N/A
+   ------------------------------------------------------------
+7. Conversation ID: conv_3901k1rtpp53ejhs7zkxyb3k800s
+   Status: done
+   Duration: 230s
+   Start Time: 2025-08-03T20:41:51.000Z
+   Call Successful: success
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: Coalesce Demo Scheduling
+   ------------------------------------------------------------
+8. Conversation ID: conv_9201k1rq3qref7bvgwp8bvbh8fjr
+   Status: done
+   Duration: 9s
+   Start Time: 2025-08-03T19:39:04.000Z
+   Call Successful: unknown
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: Coalesce platform introduction
+   ------------------------------------------------------------
+9. Conversation ID: conv_9701k1rpyr8fezr96mf537pz1nm1
+   Status: failed
+   Duration: 26s
+   Start Time: 2025-08-03T19:36:26.000Z
+   Call Successful: failure
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: Wrong number, sales call
+   ------------------------------------------------------------
+10. Conversation ID: conv_8301k1rpscceerztse2ajt59y6nf
+   Status: done
+   Duration: 5s
+   Start Time: 2025-08-03T19:33:45.000Z
+   Call Successful: unknown
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: Phone call introduction
+   ------------------------------------------------------------
+11. Conversation ID: conv_0001k1rpsbctfgbvc1k0bz7a7rhb
+   Status: done
+   Duration: 13s
+   Start Time: 2025-08-03T19:33:30.000Z
+   Call Successful: failure
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: Coalesce introduction call
+   ------------------------------------------------------------
+12. Conversation ID: conv_6501k1r745n8fqc9nxqstgdw6jea
+   Status: done
+   Duration: 17s
+   Start Time: 2025-08-03T14:59:46.000Z
+   Call Successful: success
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: Coalesce introduction call
+   ------------------------------------------------------------
+13. Conversation ID: conv_1601k1r6rzwve7y9dqsmxnwzc1xa
+   Status: done
+   Duration: 76s
+   Start Time: 2025-08-03T14:53:35.000Z
+   Call Successful: success
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: Coalesce: Data Transformation Tool
+   ------------------------------------------------------------
+14. Conversation ID: conv_4201k1qnr4gbeqfsbwgpfz0t2a6f
+   Status: done
+   Duration: 128s
+   Start Time: 2025-08-03T09:56:01.000Z
+   Call Successful: success
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: Coalesce sales call
+   ------------------------------------------------------------
+15. Conversation ID: conv_2801k1qmwg6kema9kxv5z63732ne
+   Status: done
+   Duration: 13s
+   Start Time: 2025-08-03T09:40:56.000Z
+   Call Successful: success
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: Coalesce introduction call
+   ------------------------------------------------------------
+16. Conversation ID: conv_01jzrhfh0deadrw5rdq12fydbt
+   Status: done
+   Duration: 230s
+   Start Time: 2025-07-09T21:29:16.000Z
+   Call Successful: success
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: N/A
+   ------------------------------------------------------------
+17. Conversation ID: conv_01jzrgg19ked4bhsnefx0hedxk
+   Status: done
+   Duration: 51s
+   Start Time: 2025-07-09T21:12:04.000Z
+   Call Successful: success
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: N/A
+   ------------------------------------------------------------
+18. Conversation ID: conv_01jzr61rgtebg9d52z6ed4z0bc
+   Status: done
+   Duration: 63s
+   Start Time: 2025-07-09T18:09:30.000Z
+   Call Successful: success
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: N/A
+   ------------------------------------------------------------
+19. Conversation ID: conv_01jzr5jpa3e8pt2sr43s3vc7p8
+   Status: done
+   Duration: 25s
+   Start Time: 2025-07-09T18:01:16.000Z
+   Call Successful: success
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: N/A
+   ------------------------------------------------------------
+20. Conversation ID: conv_01jzr5j600fg49jfcnpjdw3thw
+   Status: done
+   Duration: 10s
+   Start Time: 2025-07-09T18:01:00.000Z
+   Call Successful: success
+   Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+   Agent Name: Sales agent
+   Transcript Summary: No
+   Call Summary Title: N/A
+   ------------------------------------------------------------
+
+🔍 Analyzing which calls should be stored vs skipped:
+================================================================================
+❌ SKIP: conv_8601k1x8qbxqf9mtzzxps2y1j99x - Status: initiated (incomplete call)
+✅ STORE: conv_9901k1tganggfqr84q5g8kq94n7d - Status: done, Duration: 16s → "answered"
+✅ STORE: conv_9501k1tg831fep2vxf5e9hxkmxa0 - Status: done, Duration: 9s → "answered"
+✅ STORE: conv_8301k1tg6wzsf5avefs0yafjntky - Status: done, Duration: 16s → "answered"
+✅ STORE: conv_9601k1tfjhrqfg28tm1y7bnp95y3 - Status: failed → "failed"
+✅ STORE: conv_3201k1tf552hfa0s6fgtbzt27vad - Status: failed → "failed"
+✅ STORE: conv_3901k1rtpp53ejhs7zkxyb3k800s - Status: done, Duration: 230s → "answered"
+✅ STORE: conv_9201k1rq3qref7bvgwp8bvbh8fjr - Status: done, Duration: 9s → "answered"
+✅ STORE: conv_9701k1rpyr8fezr96mf537pz1nm1 - Status: failed → "failed"
+✅ STORE: conv_8301k1rpscceerztse2ajt59y6nf - Status: done, Duration: 5s → "no_answer"
+✅ STORE: conv_0001k1rpsbctfgbvc1k0bz7a7rhb - Status: done, Duration: 13s → "answered"
+✅ STORE: conv_6501k1r745n8fqc9nxqstgdw6jea - Status: done, Duration: 17s → "answered"
+✅ STORE: conv_1601k1r6rzwve7y9dqsmxnwzc1xa - Status: done, Duration: 76s → "answered"
+✅ STORE: conv_4201k1qnr4gbeqfsbwgpfz0t2a6f - Status: done, Duration: 128s → "answered"
+✅ STORE: conv_2801k1qmwg6kema9kxv5z63732ne - Status: done, Duration: 13s → "answered"
+✅ STORE: conv_01jzrhfh0deadrw5rdq12fydbt - Status: done, Duration: 230s → "answered"
+✅ STORE: conv_01jzrgg19ked4bhsnefx0hedxk - Status: done, Duration: 51s → "answered"
+✅ STORE: conv_01jzr61rgtebg9d52z6ed4z0bc - Status: done, Duration: 63s → "answered"
+✅ STORE: conv_01jzr5jpa3e8pt2sr43s3vc7p8 - Status: done, Duration: 25s → "answered"
+✅ STORE: conv_01jzr5j600fg49jfcnpjdw3thw - Status: done, Duration: 10s → "answered"
+
+📊 Summary:
+Total conversations: 20
+Should store: 19
+Should skip: 1

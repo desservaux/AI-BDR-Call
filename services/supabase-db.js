@@ -37,9 +37,56 @@ class SupabaseDBService {
      */
     async createCall(callData) {
         try {
+            const phoneNumber = callData.phoneNumber || callData.phone_number;
+            
+            if (!phoneNumber) {
+                throw new Error('Phone number is required for call creation');
+            }
+
+            // Ensure phone number record exists (UPSERT)
+            let phoneNumberId = null;
+            try {
+                // Try to find existing phone number
+                const { data: existingPhone, error: findError } = await this.client
+                    .from('phone_numbers')
+                    .select('id')
+                    .eq('phone_number', phoneNumber)
+                    .single();
+
+                if (findError && findError.code !== 'PGRST116') { // PGRST116 = no rows returned
+                    throw findError;
+                }
+
+                if (existingPhone) {
+                    phoneNumberId = existingPhone.id;
+                } else {
+                    // Create new phone number record using UPSERT
+                    const { data: newPhone, error: createError } = await this.client
+                        .from('phone_numbers')
+                        .upsert([{
+                            phone_number: phoneNumber,
+                            phone_type: 'mobile',
+                            is_primary: true,
+                            do_not_call: false
+                        }], {
+                            onConflict: 'phone_number',
+                            ignoreDuplicates: false
+                        })
+                        .select('id')
+                        .single();
+
+                    if (createError) throw createError;
+                    phoneNumberId = newPhone.id;
+                }
+            } catch (error) {
+                console.error('Error ensuring phone number exists:', error.message);
+                // Continue without phone_number_id if there's an error
+            }
+
             // Prepare call data with all possible fields
             const insertData = {
-                phone_number: callData.phoneNumber || callData.phone_number,
+                phone_number: phoneNumber,
+                phone_number_id: phoneNumberId,
                 chat_id: callData.chatId, // Keep for backward compatibility
                 chat_group_id: callData.chatGroupId, // Keep for backward compatibility
                 status: callData.status || 'active',
@@ -50,6 +97,44 @@ class SupabaseDBService {
                 sequence_status: callData.sequence_status || 'active',
                 created_at: callData.created_at || new Date().toISOString()
             };
+
+            // Add ElevenLabs specific fields if available
+            if (callData.elevenlabs_conversation_id) {
+                insertData.elevenlabs_conversation_id = callData.elevenlabs_conversation_id;
+            }
+            if (callData.agent_id) {
+                insertData.agent_id = callData.agent_id;
+            }
+            if (callData.agent_name) {
+                insertData.agent_name = callData.agent_name;
+            }
+            if (callData.call_successful !== undefined) {
+                insertData.call_successful = callData.call_successful;
+            }
+            if (callData.call_result) {
+                insertData.call_result = callData.call_result;
+            }
+            if (callData.answered !== undefined) {
+                insertData.answered = callData.answered;
+            }
+            if (callData.duration_seconds) {
+                insertData.duration_seconds = callData.duration_seconds;
+            }
+            if (callData.message_count) {
+                insertData.message_count = callData.message_count;
+            }
+            if (callData.start_time) {
+                insertData.start_time = callData.start_time;
+            }
+            if (callData.call_summary_title) {
+                insertData.call_summary_title = callData.call_summary_title;
+            }
+            if (callData.transcript_summary) {
+                insertData.transcript_summary = callData.transcript_summary;
+            }
+            if (callData.is_external_call !== undefined) {
+                insertData.is_external_call = callData.is_external_call;
+            }
 
             // Remove undefined values
             Object.keys(insertData).forEach(key => {
@@ -71,6 +156,7 @@ class SupabaseDBService {
                 // Fallback: insert with only basic fields
                 const basicInsertData = {
                     phone_number: insertData.phone_number,
+                    phone_number_id: insertData.phone_number_id,
                     status: insertData.status,
                     created_at: insertData.created_at
                 };
@@ -92,7 +178,7 @@ class SupabaseDBService {
                 throw error;
             }
             
-            console.log(`✅ Call created with ID: ${data.id}`);
+            console.log(`✅ Call created with ID: ${data.id}, phone_number_id: ${phoneNumberId}`);
             return data;
         } catch (error) {
             console.error('Error creating call:', error.message);
@@ -1106,6 +1192,7 @@ class SupabaseDBService {
      */
     async getPhoneNumbers(filters = {}) {
         try {
+            // Get phone numbers from the phone_numbers table only
             let query = this.client
                 .from('phone_numbers')
                 .select(`
@@ -1149,6 +1236,109 @@ class SupabaseDBService {
         } catch (error) {
             console.error('Error getting phone numbers:', error.message);
             throw new Error(`Failed to get phone numbers: ${error.message}`);
+        }
+    }
+
+    async generatePhoneNumbersFromCalls(filters = {}) {
+        try {
+            // Get unique phone numbers from calls
+            const { data: calls, error: callsError } = await this.client
+                .from('calls')
+                .select('phone_number')
+                .neq('phone_number', 'unknown')
+                .order('created_at', { ascending: false });
+
+            if (callsError) throw callsError;
+
+            // Get unique phone numbers
+            const uniquePhoneNumbers = [...new Set(calls.map(call => call.phone_number))];
+            
+            // Create phone number records for each unique number
+            const phoneNumberRecords = [];
+            for (const phoneNumber of uniquePhoneNumbers) {
+                // Check if phone number already exists
+                const { data: existingPhone, error: checkError } = await this.client
+                    .from('phone_numbers')
+                    .select('id')
+                    .eq('phone_number', phoneNumber)
+                    .single();
+
+                if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+                    console.error(`Error checking phone number ${phoneNumber}:`, checkError);
+                    continue;
+                }
+
+                if (!existingPhone) {
+                    // Create new phone number record
+                    const phoneRecord = {
+                        phone_number: phoneNumber,
+                        phone_type: 'mobile',
+                        is_primary: true,
+                        do_not_call: false
+                    };
+
+                    const { data: createdPhone, error: createError } = await this.client
+                        .from('phone_numbers')
+                        .insert([phoneRecord])
+                        .select('*')
+                        .single();
+
+                    if (createError) {
+                        console.error(`Error creating phone number ${phoneNumber}:`, createError);
+                        continue;
+                    }
+
+                    phoneNumberRecords.push(createdPhone);
+                } else {
+                    // Get existing phone number with full details
+                    const { data: existingPhoneFull, error: getError } = await this.client
+                        .from('phone_numbers')
+                        .select(`
+                            *,
+                            contacts (
+                                id,
+                                first_name,
+                                last_name,
+                                email,
+                                company_name,
+                                position
+                            )
+                        `)
+                        .eq('id', existingPhone.id)
+                        .single();
+
+                    if (!getError) {
+                        phoneNumberRecords.push(existingPhoneFull);
+                    }
+                }
+            }
+
+            // Apply filters to the generated phone numbers
+            let filteredPhoneNumbers = phoneNumberRecords;
+
+            if (filters.phoneNumber) {
+                filteredPhoneNumbers = filteredPhoneNumbers.filter(pn => 
+                    pn.phone_number.toLowerCase().includes(filters.phoneNumber.toLowerCase())
+                );
+            }
+
+            if (filters.phoneType) {
+                filteredPhoneNumbers = filteredPhoneNumbers.filter(pn => 
+                    pn.phone_type === filters.phoneType
+                );
+            }
+
+            if (filters.doNotCall !== undefined) {
+                filteredPhoneNumbers = filteredPhoneNumbers.filter(pn => 
+                    pn.do_not_call === filters.doNotCall
+                );
+            }
+
+            return filteredPhoneNumbers;
+
+        } catch (error) {
+            console.error('Error generating phone numbers from calls:', error.message);
+            return [];
         }
     }
 
@@ -1275,8 +1465,24 @@ class SupabaseDBService {
      */
     async getCallsByPhoneNumberId(phoneNumberId, options = {}) {
         try {
+            // First, try to get the phone number record to get the actual phone number
+            const { data: phoneRecord, error: phoneError } = await this.client
+                .from('phone_numbers')
+                .select('phone_number')
+                .eq('id', phoneNumberId)
+                .single();
+
+            if (phoneError) {
+                console.log(`Phone number record not found for ID: ${phoneNumberId}, trying direct phone number lookup`);
+                // If phone number record doesn't exist, we can't proceed
+                return [];
+            }
+
+            const phoneNumber = phoneRecord.phone_number;
+
+            // Try to get calls by phone_number_id first
             let query = this.client
-                .from('calls_with_analysis')
+                .from('calls')
                 .select('*')
                 .eq('phone_number_id', phoneNumberId)
                 .order('created_at', { ascending: false });
@@ -1294,7 +1500,34 @@ class SupabaseDBService {
 
             if (error) throw error;
             
-            return data || [];
+            // If we found calls by phone_number_id, return them
+            if (data && data.length > 0) {
+                return data;
+            }
+
+            // If no calls found by phone_number_id, try to find calls by phone_number directly
+            console.log(`No calls found by phone_number_id, trying direct phone number search: ${phoneNumber}`);
+            
+            let fallbackQuery = this.client
+                .from('calls')
+                .select('*')
+                .eq('phone_number', phoneNumber)
+                .order('created_at', { ascending: false });
+
+            if (options.limit) {
+                fallbackQuery = fallbackQuery.limit(options.limit);
+            }
+
+            if (options.page && options.limit) {
+                const offset = (options.page - 1) * options.limit;
+                fallbackQuery = fallbackQuery.range(offset, offset + options.limit - 1);
+            }
+
+            const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+
+            if (fallbackError) throw fallbackError;
+            
+            return fallbackData || [];
         } catch (error) {
             console.error('Error getting calls by phone number:', error.message);
             throw new Error(`Failed to get calls by phone number: ${error.message}`);
@@ -1617,21 +1850,37 @@ class SupabaseDBService {
     /**
      * Get call by conversation ID
      * @param {string} conversationId - ElevenLabs conversation ID
-     * @returns {Promise<Object>} Call record
+     * @returns {Promise<Object|null>} Call record or null if not found
      */
     async getCallByConversationId(conversationId) {
         try {
+            console.log(`🔍 Looking for conversation ID: ${conversationId}`);
+            
             const { data, error } = await this.client
                 .from('calls')
                 .select('*')
                 .eq('elevenlabs_conversation_id', conversationId)
                 .single();
 
-            if (error) throw error;
-            
+            if (error && error.code === 'PGRST116') {
+                console.log(`❌ Conversation ${conversationId} not found in database`);
+                return null; // Not found
+            }
+            if (error && error.message.includes('column calls.elevenlabs_conversation_id does not exist')) {
+                // Fallback: try to find by phone number and other fields
+                console.log('⚠️ elevenlabs_conversation_id column not found, using fallback search');
+                return null; // For now, return null to create new record
+            }
+            if (error) {
+                console.error(`❌ Database error for conversation ${conversationId}:`, error.message);
+                throw error;
+            }
+
+            console.log(`✅ Found existing call for conversation ${conversationId}: ${data.id}`);
             return data;
         } catch (error) {
-            console.error('Error getting call by conversation ID:', error.message);
+            console.error(`❌ Error getting call by conversation ID ${conversationId}:`, error.message);
+            // Don't throw error, just return null to create new record
             return null;
         }
     }
@@ -1887,19 +2136,37 @@ class SupabaseDBService {
         const result = {
             contact_created: false,
             phone_created: false,
-            duplicate: false
+            duplicate: false,
+            blocked: false,
+            partial_import: false,
+            message: ''
         };
 
         try {
+            // Normalize phone number format
+            const normalizedPhone = this.normalizePhoneNumber(rowData.phone_number);
+            if (!normalizedPhone) {
+                result.blocked = true;
+                result.message = 'Invalid phone number format';
+                return result;
+            }
+
             // Check if phone number already exists
-            const existingPhone = await this.client
+            const { data: existingPhone, error: checkPhoneError } = await this.client
                 .from('phone_numbers')
-                .select('id')
-                .eq('phone_number', rowData.phone_number)
+                .select('id, contact_id')
+                .eq('phone_number', normalizedPhone)
                 .single();
 
-            if (existingPhone.data) {
+            if (checkPhoneError && checkPhoneError.code !== 'PGRST116') { // PGRST116 = no rows returned
+                throw checkPhoneError;
+            }
+
+            if (existingPhone) {
+                // Phone number exists - block import
                 result.duplicate = true;
+                result.blocked = true;
+                result.message = `Phone number ${normalizedPhone} already exists`;
                 return result;
             }
 
@@ -1928,30 +2195,65 @@ class SupabaseDBService {
                 result.contact_created = true;
             }
 
-            // Create phone number
+            // Create phone number using UPSERT to prevent race conditions
             const phoneData = {
                 contact_id: contactId,
-                phone_number: rowData.phone_number,
-                phone_type: rowData.phone_type,
-                is_primary: rowData.is_primary,
-                do_not_call: rowData.do_not_call
+                phone_number: normalizedPhone,
+                phone_type: rowData.phone_type || 'mobile',
+                is_primary: rowData.is_primary || true,
+                do_not_call: rowData.do_not_call || false
             };
 
-            const { data: phone, error: phoneError } = await this.client
+            const { data: phone, error: createPhoneError } = await this.client
                 .from('phone_numbers')
-                .insert([phoneData])
+                .upsert([phoneData], {
+                    onConflict: 'phone_number',
+                    ignoreDuplicates: false
+                })
                 .select()
                 .single();
 
-            if (phoneError) throw phoneError;
+            if (createPhoneError) throw createPhoneError;
             
             result.phone_created = true;
+            result.message = 'Contact and phone number created successfully';
             return result;
 
         } catch (error) {
             console.error('Error processing contact row:', error.message);
-            throw error;
+            result.blocked = true;
+            result.message = `Error: ${error.message}`;
+            return result;
         }
+    }
+
+    /**
+     * Normalize phone number format
+     * @param {string} phoneNumber - Raw phone number
+     * @returns {string|null} Normalized phone number or null if invalid
+     */
+    normalizePhoneNumber(phoneNumber) {
+        if (!phoneNumber) return null;
+        
+        // Remove all non-digit characters except +
+        let normalized = phoneNumber.replace(/[^\d+]/g, '');
+        
+        // Handle international format
+        if (normalized.startsWith('+')) {
+            // Keep as is for international numbers
+            return normalized;
+        } else if (normalized.startsWith('1') && normalized.length === 11) {
+            // US number starting with 1
+            return `+${normalized}`;
+        } else if (normalized.length === 10) {
+            // US number without country code
+            return `+1${normalized}`;
+        } else if (normalized.length >= 10) {
+            // Assume it's a valid number, add + if not present
+            return normalized.startsWith('+') ? normalized : `+${normalized}`;
+        }
+        
+        return null; // Invalid format
     }
 
     /**

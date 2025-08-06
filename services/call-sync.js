@@ -187,7 +187,8 @@ s    }
                 console.log(`✅ Created new call record: ${createdCall.id} (${result.is_external ? 'external' : 'internal'})`);
                 
                 // If it's a completed call, get detailed conversation data
-                if (conversation.status === 'done' && conversation.call_duration_secs > 0) {
+                // =========== FIX 1: Broaden condition to fetch details ===========
+                if (['done', 'failed', 'processing'].includes(conversation.status) && conversation.call_duration_secs > 0) {
                     await this.processDetailedConversation(conversation.conversation_id, createdCall.id);
                 }
             } else {
@@ -226,7 +227,7 @@ s    }
                 return;
             }
 
-            // Update the call record with detailed information
+            // =========== FIX 2: Update record with final status and success flag ===========
             const updateData = {
                 elevenlabs_conversation_id: conversationId,
                 phone_number: conversationData.to_number || conversationData.external_number,
@@ -235,10 +236,13 @@ s    }
                 start_time: conversationData.start_time,
                 call_summary_title: conversationData.call_summary_title,
                 transcript_summary: conversationData.transcript_summary,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
+                // Add these crucial fields to save the final, accurate status
+                status: this.mapElevenLabsStatus(conversationData.status),
+                call_successful: conversationData.call_successful === 'success'
             };
             
-            console.log(`🔧 Updating call ${callId} with phone: ${updateData.phone_number}, duration: ${updateData.duration_seconds}s`);
+            console.log(`🔧 Updating call ${callId} with phone: ${updateData.phone_number}, duration: ${updateData.duration_seconds}s, status: ${updateData.status}, successful: ${updateData.call_successful}`);
             
             await this.dbService.updateCall(callId, updateData);
             console.log(`✅ Updated call ${callId} with detailed information`);
@@ -361,7 +365,7 @@ s    }
             call_successful: conversation.call_successful === 'success',
             duration_seconds: conversation.duration || conversation.call_duration_secs || 0,
             message_count: conversation.message_count || 0,
-            start_time: conversation.start_time || conversation.created_at,
+            start_time: conversation.start_time || null,
             call_summary_title: conversation.call_summary_title,
             transcript_summary: conversation.transcript_summary,
             is_external_call: isExternal,
@@ -381,7 +385,7 @@ s    }
             call_successful: conversation.call_successful === 'success',
             duration_seconds: conversation.duration || conversation.call_duration_secs,
             message_count: conversation.message_count,
-            start_time: conversation.start_time || conversation.created_at,
+            start_time: conversation.start_time || null,
             call_summary_title: conversation.call_summary_title,
             transcript_summary: conversation.transcript_summary,
             updated_at: new Date().toISOString()
@@ -400,6 +404,7 @@ s    }
             case 'failed':
                 return 'failed';
             case 'active':
+            case 'in-progress':
                 return 'active';
             default:
                 return 'unknown';

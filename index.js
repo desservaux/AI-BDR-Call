@@ -203,7 +203,12 @@ app.post('/webhook/elevenlabs-call-ended', async (req, res) => {
 
 // Helper function to map call status based on call data
 function mapCallStatus(call) {
-    // Enhanced status mapping based on call_successful, duration_seconds, and message_count
+    // Use the new call_result field if available (from Phase 18.1 status mapping)
+    if (call.call_result) {
+        return call.call_result;
+    }
+    
+    // Fallback to legacy status mapping for older calls
     if (call.call_successful === true && call.duration_seconds > 0) {
         return 'answered'; // Successful connection with conversation
     } else if (call.call_successful === false || (call.duration_seconds === 0 && call.call_successful === false)) {

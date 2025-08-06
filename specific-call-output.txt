@@ -1,0 +1,45 @@
+🔍 Checking detailed data for specific call...
+✅ ElevenLabs service initialized successfully. Found undefined agents.
+
+📋 Getting detailed conversation data for conv_8601k1x8qbxqf9mtzzxps2y1j99x...
+📋 Retrieving enhanced conversation details for conv_8601k1x8qbxqf9mtzzxps2y1j99x...
+⚠️ No transcript or messages found in response
+✅ Enhanced conversation details retrieved successfully
+📊 Call duration: 0s, Messages: 0
+📞 Phone number: +33343584946, External number: +33343584946, Agent number: +447846855904
+🔍 Raw response fields: agent_id, conversation_id, status, user_id, transcript, metadata, analysis, conversation_initiation_client_data, has_audio, has_user_audio, has_response_audio
+🔍 External number in response: undefined
+🔍 Agent number in response: undefined
+🔍 Metadata fields: start_time_unix_secs, accepted_time_unix_secs, call_duration_secs, cost, deletion_settings, feedback, authorization_method, charging, phone_call, batch_call, termination_reason, error, main_language, rag_usage, text_only, features_usage, eleven_assistant, initiator_id, conversation_initiation_source, conversation_initiation_source_version, timezone
+🔍 External number in metadata: undefined
+🔍 Agent number in metadata: undefined
+🔍 Phone call data: {"direction":"outbound","phone_number_id":"phnum_0101k1tg02tkf5paw24vvbtwrmr2","agent_number":"+447846855904","external_number":"+33343584946","type":"twilio","stream_sid":"","call_sid":"CA3caaa4f4d2d0eaf0d640498ad78fe3b4"}
+🔍 Conversation initiation data: {"conversation_config_override":{"tts":null,"conversation":null,"agent":null},"custom_llm_extra_body":{},"user_id":null,"source_info":{"source":null,"version":null},"dynamic_variables":{"name_test":"Kyle","weekday":"Monday"}}
+
+📊 Detailed Conversation Data:
+================================================================================
+Conversation ID: conv_8601k1x8qbxqf9mtzzxps2y1j99x
+Status: initiated
+Duration: 0s
+Start Time: 2025-08-05T14:03:51.000Z
+Call Successful: undefined
+Agent ID: agent_01jzr5hv9eefkbmnyz8y6smw19
+Agent Name: undefined
+
+📞 Phone Number Analysis:
+to_number: +33343584946
+phone_number: N/A
+external_number: +33343584946
+agent_number: +447846855904
+
+📋 Metadata Analysis:
+metadata.phone_call?.external_number: +33343584946
+metadata.phone_call?.agent_number: +447846855904
+metadata.external_number: N/A
+metadata.agent_number: N/A
+
+🔍 Validation Check:
+Extracted phone number: +33343584946
+Phone number valid: true
+Status valid: false
+Would pass validation: false
