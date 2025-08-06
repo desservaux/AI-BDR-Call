@@ -14,6 +14,41 @@ class ElevenLabsService {
     }
 
     /**
+     * Compute call outcome based on status_raw and duration
+     * Pure function that determines call result based on ElevenLabs status and duration
+     * @param {string} status_raw - Raw ElevenLabs status ('initiated', 'in-progress', 'processing', 'done', 'failed')
+     * @param {number} durationSecs - Call duration in seconds
+     * @returns {string|null} - 'answered', 'unanswered', 'failed', or null for non-final calls
+     */
+    computeOutcomeFrom(status_raw, durationSecs) {
+        // Non-final statuses - return null to indicate "not final"
+        if (['initiated', 'in-progress', 'processing'].includes(status_raw)) {
+            return null;
+        }
+
+        // Handle 'done' status
+        if (status_raw === 'done') {
+            if (durationSecs > 5) {
+                return 'answered';
+            } else {
+                return 'unanswered';
+            }
+        }
+
+        // Handle 'failed' status
+        if (status_raw === 'failed') {
+            if (durationSecs > 5) {
+                return 'answered'; // Override edge case
+            } else {
+                return 'failed';
+            }
+        }
+
+        // Default case for unknown status
+        return null;
+    }
+
+    /**
      * Initialize the ElevenLabs service
      * @returns {Promise<boolean>} True if initialization is successful
      */
@@ -304,7 +339,7 @@ class ElevenLabsService {
             
             const response = await this.client.get(`/convai/conversations/${conversationId}`);
             
-            // Extract comprehensive metadata
+            // Extract data from documented ElevenLabs API fields
             const conversationData = {
                 success: true,
                 conversation_id: conversationId,
@@ -312,35 +347,49 @@ class ElevenLabsService {
                 agent_name: response.data.agent_name,
                 phone_number_id: response.data.phone_number_id,
                 phone_number: response.data.phone_number,
-                to_number: response.data.external_number || response.data.metadata?.phone_call?.external_number || response.data.metadata?.external_number || response.data.to_number,
-                agent_number: response.data.agent_number || response.data.metadata?.phone_call?.agent_number || response.data.metadata?.agent_number,
-                external_number: response.data.external_number || response.data.metadata?.phone_call?.external_number || response.data.metadata?.external_number,
-                start_time: response.data.metadata?.start_time_unix_secs ? new Date(response.data.metadata.start_time_unix_secs * 1000).toISOString() : null,
+                
+                // Extract to_number from best available documented location
+                to_number: response.data.metadata?.phone_call?.external_number || 
+                          response.data.metadata?.external_number || 
+                          response.data.external_number || 
+                          response.data.to_number || null,
+                
+                agent_number: response.data.agent_number || 
+                             response.data.metadata?.phone_call?.agent_number || 
+                             response.data.metadata?.agent_number,
+                
+                // Extract start_time from documented field: metadata.start_time_unix_secs → ISO
+                start_time: response.data.metadata?.start_time_unix_secs ? 
+                           new Date(response.data.metadata.start_time_unix_secs * 1000).toISOString() : null,
+                
                 end_time: response.data.end_time,
+                
+                // Extract duration from documented field: metadata.call_duration_secs
                 duration: response.data.metadata?.call_duration_secs || response.data.duration || 0,
-                status: response.data.status,
-                // Do NOT read or pass through analysis.call_successful
-                message_count: response.data.message_count || (response.data.messages ? response.data.messages.length : 0),
+                
+                // Extract status_raw from documented field: response.data.status
+                status_raw: response.data.status,
+                
+                // Extract message_count from documented field: response.data.message_count || transcript.length || 0
+                message_count: response.data.message_count || 
+                              (response.data.transcript ? response.data.transcript.length : 0) || 
+                              (response.data.messages ? response.data.messages.length : 0) || 0,
+                
+                // Extract documented fields
                 transcript_summary: response.data.transcript_summary,
                 call_summary_title: response.data.call_summary_title,
+                
                 messages: response.data.messages || [],
-                transcript: this.generateTranscript(response.data.messages || []),
                 metadata: response.data.metadata || {}
             };
             
-            // Check if there's a transcript field in the response
+            // Extract transcript from documented field: response.data.transcript (fallback to messages synthesized if needed)
             if (response.data.transcript && response.data.transcript.length > 0) {
                 console.log(`📝 Found transcript with ${response.data.transcript.length} entries`);
-                console.log(`📝 First transcript entry:`, JSON.stringify(response.data.transcript[0]));
-                console.log(`📝 Processing transcript entries...`);
                 conversationData.transcript = this.generateTranscript(response.data.transcript);
-                console.log(`📝 Generated transcript:`, JSON.stringify(conversationData.transcript[0]));
             } else if (response.data.messages && response.data.messages.length > 0) {
-                console.log(`📝 Found messages with ${response.data.messages.length} entries`);
-                console.log(`📝 First message entry:`, JSON.stringify(response.data.messages[0]));
-                console.log(`📝 Processing message entries...`);
+                console.log(`📝 Found messages with ${response.data.messages.length} entries, synthesizing transcript`);
                 conversationData.transcript = this.generateTranscript(response.data.messages);
-                console.log(`📝 Generated transcript:`, JSON.stringify(conversationData.transcript[0]));
             } else {
                 console.log(`⚠️ No transcript or messages found in response`);
                 // Try to create a basic transcript from available data
@@ -352,20 +401,18 @@ class ElevenLabsService {
                         message_type: 'summary'
                     }];
                     console.log(`📝 Created transcript from summary`);
+                } else {
+                    conversationData.transcript = [];
                 }
             }
             
             console.log(`✅ Enhanced conversation details retrieved successfully`);
             console.log(`📊 Call duration: ${conversationData.duration}s, Messages: ${conversationData.message_count}`);
-            console.log(`📞 Phone number: ${conversationData.to_number}, External number: ${conversationData.external_number}, Agent number: ${conversationData.agent_number}`);
+            console.log(`📞 Phone number: ${conversationData.to_number}, Agent number: ${conversationData.agent_number}`);
+            console.log(`🔍 Status: ${conversationData.status_raw}, Duration: ${conversationData.duration}s`);
             console.log(`🔍 Raw response fields: ${Object.keys(response.data).join(', ')}`);
-            console.log(`🔍 External number in response: ${response.data.external_number}`);
-            console.log(`🔍 Agent number in response: ${response.data.agent_number}`);
             console.log(`🔍 Metadata fields: ${Object.keys(response.data.metadata || {}).join(', ')}`);
-            console.log(`🔍 External number in metadata: ${response.data.metadata?.external_number}`);
-            console.log(`🔍 Agent number in metadata: ${response.data.metadata?.agent_number}`);
             console.log(`🔍 Phone call data: ${JSON.stringify(response.data.metadata?.phone_call)}`);
-            console.log(`🔍 Conversation initiation data: ${JSON.stringify(response.data.conversation_initiation_client_data)}`);
             
             return conversationData;
         } catch (error) {

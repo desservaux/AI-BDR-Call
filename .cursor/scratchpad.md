@@ -19,8 +19,11 @@
 - ✅ Analytics dashboard with 6 chart types
 - ✅ Sequence preparation infrastructure
 
-**NEXT OBJECTIVE**: 🎯 Phase 18 - ElevenLabs Sync Data Mapping Fixes
-Fix critical data synchronization issues between ElevenLabs API and Supabase database including incorrect status mapping, date display problems, and potential duplicate call entries. Ensure call history matches ElevenLabs UI exactly.
+**NEXT OBJECTIVE**: ✅ Phase 19 - ElevenLabs Normalization and Outcome Computation COMPLETED
+Successfully implemented comprehensive normalization of ElevenLabs API data and outcome computation based on call_result field only. All data extraction now uses documented ElevenLabs API fields and the computeOutcomeFrom function is fully implemented and tested.
+
+**NEXT OBJECTIVE**: 🎯 Phase 20 - Sync Flow for Final Calls Only
+Implement sync flow that only persists final calls with call_result, removing dependency on status and answered fields.
 
 ## Key Challenges and Analysis
 
@@ -31,40 +34,60 @@ Fix critical data synchronization issues between ElevenLabs API and Supabase dat
 - ✅ Advanced dashboard with filtering, pagination, and analytics
 - ✅ Call detail views with transcript enhancement
 
-### 🎯 CURRENT CHALLENGE: ElevenLabs Sync Data Mapping Issues
+### ✅ RESOLVED: ElevenLabs Sync Data Mapping Issues
+- ✅ Fixed status mapping logic with duration-based computation
+- ✅ Standardized start_time extraction from ElevenLabs metadata
+- ✅ Implemented call filtering for non-final calls
+- ✅ Removed dependency on ElevenLabs' call_successful field
 
-**Objective**: Fix critical data synchronization problems between ElevenLabs API and Supabase database to ensure accurate call history display matching ElevenLabs UI.
+### ✅ RESOLVED: ElevenLabs Normalization and Outcome Computation
 
-**Critical Issues Identified**:
-1. **Incorrect Status Mapping**: Current system maps ElevenLabs statuses incorrectly and processes incomplete calls
-2. **Date Display Mismatch**: Multiple calls showing on same date in UI vs ElevenLabs, inconsistent date extraction
-3. **Missing Evaluation Results**: Status field not storing proper call outcomes ("answered", "no answer", "failed")
-4. **Incomplete Call Filtering**: Processing in-progress/initiated calls that should be skipped
+**Objective**: ✅ Implement comprehensive normalization of ElevenLabs API data and outcome computation based on call_result field only.
 
-### ✅ RESOLVED: Contacts, Sequences, and Uploads
+**Key Requirements Completed**:
+1. **Outcome Computation Function**: ✅ Added `computeOutcomeFrom(status_raw, durationSecs)` function
+   - ✅ If status_raw in ['initiated','in-progress','processing'] → return null (not final)
+   - ✅ If status_raw === 'done': durationSecs > 5 → 'answered', else → 'unanswered'
+   - ✅ If status_raw === 'failed': durationSecs > 5 → 'answered' (override), else → 'failed'
 
-**Previous Objective**: Update schema for contacts and phone numbers, implement views for calls per person/number, sequence management, and contact upload feature.
+2. **ElevenLabs Normalization**: ✅ Updated `getConversationDetailsEnhanced()`:
+   - ✅ Extract from documented fields: start_time, duration, status_raw, message_count, transcript
+   - ✅ Extract call_summary_title, transcript_summary
+   - ✅ Extract to_number from best available documented location
+   - ✅ Use proper fallbacks for transcript data
+
+**Critical Issues Resolved**:
+- ✅ **Outcome Computation**: Implemented pure function based on status_raw and duration only
+- ✅ **Data Extraction**: Use documented ElevenLabs API fields consistently
+- ✅ **Transcript Handling**: Proper fallback strategies for transcript data
+- ✅ **Phone Number Extraction**: Found best documented location for to_number
+
+### 🎯 CURRENT CHALLENGE: Sync Flow for Final Calls Only
+
+**Objective**: Implement sync flow that only persists final calls with call_result, removing dependency on status and answered fields.
 
 **Key Requirements**:
-1. **Database Schema Update**: Add contacts and phone_numbers tables, update calls table with links and new fields like call_result, answered.
-2. **Contacts Management**: Handle people with multiple phones, names, email, company, position.
-3. **Call Views**: Lists of calls per contact and per phone number.
-4. **Sequences**: Put numbers into sequences for retries if unanswered, track attempts, next call time.
-5. **Uploads**: Upload CSV lists of contacts, parse and insert into DB, add to sequences.
-6. **Future Notes**: Ability to add notes after calls (e.g., callback time).
-7. **Responsive Design**: Ensure all new views are mobile-friendly.
-8. **Performance**: Efficient querying for large datasets, migration without data loss.
+1. **CallSyncService.processConversation()**: 
+   - If status_raw in ['initiated','in-progress','processing'] → skip early; do not persist anything
+   - For status_raw in ['done','failed']: create minimal row or process existing call
+   - Immediately call processDetailedConversation() for all final calls
 
-**Challenges**:
-- Safe schema migration on existing data, handling cases where numbers don't have associated contacts initially.
-- Handling unknown contacts/numbers gracefully.
-- Implementing sequence logic without overcomplicating, including batch calling with concurrency limits.
-- Parsing and validating uploaded CSV data.
-- Ensuring data consistency (e.g., propagating 'do_not_call' status).
+2. **CallSyncService.processDetailedConversation()**:
+   - Fetch enhanced details; build consolidatedData with all required fields
+   - Compute call_result = computeOutcomeFrom(status_raw, duration)
+   - Update call with only call_result (not status or answered)
+   - Replace transcriptions: delete by call_id; insert mapped transcript
+   - Run analysis with new criteria: duration >= 10, message_count >= 2, call_result !== 'failed'
+
+**Critical Issues to Address**:
+- **Final Call Filtering**: Only process calls with status 'done' or 'failed'
+- **Minimal Row Creation**: Create minimal rows for new final calls
+- **Outcome Computation**: Use only call_result field, remove answered dependency
+- **Analysis Criteria**: Update analysis conditions to use new criteria
 
 ## High-level Task Breakdown
 
-### ✅ COMPLETED: Phases 1-17 - Full System Implementation
+### ✅ COMPLETED: Phases 1-18 - Full System Implementation
 
 **Phases 1-11**: ✅ ElevenLabs integration, call logging, Gemini analysis, dashboard with analytics
 **Phase 12**: ✅ Database schema update - contacts and phone_numbers tables
@@ -73,132 +96,160 @@ Fix critical data synchronization issues between ElevenLabs API and Supabase dat
 **Phase 15**: ✅ CSV/Excel contact upload with validation
 **Phase 16**: ✅ UI/UX improvements - CRM-style design polish
 **Phase 17**: ✅ Phone number deduplication and import management
+**Phase 18**: ✅ ElevenLabs sync data mapping fixes
 
-### 🎯 Phase 18: ElevenLabs Sync Data Mapping Fixes
+### ✅ COMPLETED: Phase 19 - ElevenLabs Normalization and Outcome Computation
 
-- [x] **Task 18.1**: Fix Status Mapping Logic and Call Filtering ✅ COMPLETED
-  - **Priority**: HIGH - Critical sync logic errors
+- [x] **Task 19.1**: Implement computeOutcomeFrom Function (HIGH PRIORITY) ✅ COMPLETED
+  - **Priority**: HIGH - Core outcome computation logic
   - **Requirements**:
-    - Skip calls with status `in-progress`, `initiated`, `processing` (don't add to database)
-    - Map `done` + duration > 5s → "answered"
-    - Map `done` + duration ≤ 5s → "no answer"  
-    - Map `failed` → "failed"
-    - **BONUS**: Override "failed" calls with duration > 5s → "answered"
-  - **Success Criteria**: Only completed calls stored in database with correct status values
-  - **Implementation**: Updated mapElevenLabsStatus() function with new logic and added call filtering in processConversation()
-  - **Final Status**: ✅ 16 answered, 2 failed, 1 no_answer calls correctly classified
+    - Create pure function `computeOutcomeFrom(status_raw, durationSecs)`
+    - Handle non-final statuses: ['initiated','in-progress','processing'] → null
+    - Handle 'done' status: duration > 5 → 'answered', else → 'unanswered'
+    - Handle 'failed' status: duration > 5 → 'answered' (override), else → 'failed'
+  - **Success Criteria**: Function returns correct outcome based on status and duration only
+  - **Implementation**: Added function to ElevenLabs service with pure logic
+  - **Final Status**: ✅ Pure function implemented with correct outcome computation
 
-- [x] **Task 18.2**: Fix Date Extraction and Display Consistency ✅ COMPLETED
-  - **Priority**: HIGH - Date mismatch causing confusion
+- [x] **Task 19.2**: Update getConversationDetailsEnhanced Normalization (HIGH PRIORITY) ✅ COMPLETED
+  - **Priority**: HIGH - Data extraction consistency
   - **Requirements**:
-    - Extract actual call start time from ElevenLabs API consistently
-    - Ensure `start_time` contains actual call attempt time, not sync time
-    - Fix UI to display dates matching ElevenLabs dashboard exactly
-  - **Success Criteria**: UI dates match ElevenLabs UI dates for same calls
-  - **Implementation**: Updated ElevenLabs service to normalize conversation objects with proper start_time extraction from metadata.start_time_unix_secs
-  - **Final Status**: ✅ start_time now consistently extracted from ElevenLabs metadata
+    - Extract start_time from metadata.start_time_unix_secs → ISO
+    - Extract duration from metadata.call_duration_secs
+    - Extract status_raw from response.data.status
+    - Extract message_count from response.data.message_count || transcript.length || 0
+    - Extract transcript from response.data.transcript (fallback to messages synthesized)
+    - Extract call_summary_title, transcript_summary
+    - Extract to_number from best available documented location
+  - **Success Criteria**: All data extracted from documented ElevenLabs API fields
+  - **Implementation**: Updated getConversationDetailsEnhanced() function with proper field extraction
+  - **Final Status**: ✅ All data extracted from documented ElevenLabs API fields
 
-- [x] **Task 18.3**: Implement Streamlined Sync Flow and Outcome Computation ✅ COMPLETED
-  - **Priority**: HIGH - Remove dependency on ElevenLabs' call_successful
+- [x] **Task 19.3**: Update Call Processing to Use New Outcome Function (MEDIUM PRIORITY) ✅ COMPLETED
+  - **Priority**: MEDIUM - Integration with existing call processing
   - **Requirements**:
-    - Persist outcome fields we control: call_result ('answered' | 'unanswered' | 'failed') and answered (boolean)
-    - Use ElevenLabs only for raw metadata (status, start_time, duration, numbers, transcript)
-    - Ensure UI shows correct status, time, and number aligned with ElevenLabs UI
-  - **Success Criteria**: System uses our own outcome computation, not ElevenLabs' call_successful
-  - **Implementation**: 
-    - Updated ElevenLabs service to remove call_successful dependency
-    - Updated call-sync service with new outcome computation logic
-    - Updated UI and analytics to use call_result instead of call_successful
-    - Added proper call filtering for non-final calls
-  - **Final Status**: ✅ Complete implementation of streamlined sync flow with our own outcome fields
+    - Update call-sync service to use computeOutcomeFrom function
+    - Update UI status mapping to use new outcome computation
+    - Ensure consistency across all call processing flows
+  - **Success Criteria**: All call processing uses new outcome computation
+  - **Implementation**: Updated call-sync.js to use computeOutcomeFrom function in all methods
+  - **Final Status**: ✅ All call processing now uses new outcome computation
 
-**CRITICAL ISSUES RESOLVED**:
-- ✅ **Status Mapping Logic**: Implemented duration-based mapping with proper call filtering
-- ✅ **Date Extraction**: Standardized start_time extraction from ElevenLabs metadata
-- ✅ **Call Filtering**: Added early skipping of non-final calls (initiated, in-progress, processing)
-- ✅ **Outcome Computation**: Removed dependency on ElevenLabs' call_successful, implemented our own call_result and answered fields
-- ✅ **UI Consistency**: Updated mapCallStatus to use call_result field with proper fallbacks
-- ✅ **Analytics Updates**: Updated all analytics queries to use call_result instead of call_successful
+### 🎯 Phase 20: Sync Flow for Final Calls Only
+
+- [x] **Task 20.1**: Update processConversation Method (HIGH PRIORITY) ✅ COMPLETED
+  - **Priority**: HIGH - Core sync flow logic
+  - **Requirements**:
+    - Skip early for non-final statuses: ['initiated','in-progress','processing']
+    - Only process final calls: ['done','failed']
+    - Create minimal row for new calls or process existing calls
+    - Immediately call processDetailedConversation() for all final calls
+  - **Success Criteria**: Only final calls are persisted with minimal data
+  - **Implementation**: Updated processConversation() method with new flow logic
+  - **Final Status**: ✅ Sync flow only processes final calls with minimal row creation
+
+- [x] **Task 20.2**: Update processDetailedConversation Method (HIGH PRIORITY) ✅ COMPLETED
+  - **Priority**: HIGH - Detailed call processing
+  - **Requirements**:
+    - Fetch enhanced details and build consolidatedData
+    - Compute call_result using computeOutcomeFrom function
+    - Update call with only call_result (not status or answered)
+    - Replace transcriptions: delete by call_id; insert mapped transcript
+    - Run analysis with new criteria: duration >= 10, message_count >= 2, call_result !== 'failed'
+  - **Success Criteria**: All final calls processed with detailed data and proper outcome computation
+  - **Implementation**: Updated processDetailedConversation() method with new processing logic
+  - **Final Status**: ✅ Detailed conversation processing with proper outcome computation
+
+- [x] **Task 20.3**: Clean Up Unused Methods and Fields (MEDIUM PRIORITY) ✅ COMPLETED
+  - **Priority**: MEDIUM - Code cleanup
+  - **Requirements**:
+    - Remove convertConversationToCallData and convertConversationToUpdateData methods
+    - Remove answered field writes and references
+    - Update needsUpdate method to remove answered field
+    - Update analysis criteria to use new conditions
+  - **Success Criteria**: Clean codebase with only call_result field usage
+  - **Implementation**: Removed unused methods and cleaned up answered field references
+  - **Final Status**: ✅ Codebase cleaned up with only call_result field usage
 
 ## Project Status Board
 
-### ✅ COMPLETED: Full System Implementation (Phases 1-17)
+### ✅ COMPLETED: Full System Implementation (Phases 1-20)
 
-**System Status**: ✅ Production-ready ElevenLabs voice agent with contacts, sequences, and analytics
+**System Status**: ✅ Production-ready ElevenLabs voice agent with comprehensive sync flow
 - ✅ Server running on port 3000 | ElevenLabs integration | Dashboard with 6 chart types
 - ✅ Call details with transcripts | Analytics & filtering | Pagination & search
 - ✅ Contacts & phone number management | Sequence automation | CSV/Excel imports
 - ✅ UI/UX improvements | Deduplication logic | Real-time updates
+- ✅ ElevenLabs sync data mapping fixes with streamlined outcome computation
+- ✅ ElevenLabs normalization and outcome computation with pure functions
+- ✅ Sync flow for final calls only with call_result field
 
-### 🎯 IN PROGRESS: Phase 18 - ElevenLabs Sync Data Mapping Fixes
+### ✅ COMPLETED: Phase 20 - Sync Flow for Final Calls Only
 
-**Objective**: Fix critical data synchronization issues between ElevenLabs API and Supabase database to ensure call history matches ElevenLabs UI exactly.
+**Objective**: ✅ Implement sync flow that only persists final calls with call_result, removing dependency on status and answered fields.
 
 **Current Tasks**:
-- [x] **Task 18.1**: Fix Status Mapping Logic and Call Filtering (HIGH PRIORITY) ✅ COMPLETED
-  - Fixed mapElevenLabsStatus() function to implement new logic
-  - Added call filtering to skip incomplete calls (in-progress, initiated, processing)
-  - Implemented duration-based mapping: >5s = "answered", ≤5s = "no answer"
-  - Added override logic for "failed" calls with duration > 5s → "answered"
-  - Success Criteria: Only completed calls stored with correct status values
-  - **Final Result**: 16 answered, 2 failed, 1 no_answer calls correctly classified
+- [x] **Task 20.1**: Update processConversation Method (HIGH PRIORITY) ✅ COMPLETED
+  - Skip early for non-final statuses: ['initiated','in-progress','processing']
+  - Only process final calls: ['done','failed']
+  - Create minimal row for new calls or process existing calls
+  - Immediately call processDetailedConversation() for all final calls
+  - Success Criteria: Only final calls are persisted with minimal data
 
-- [x] **Task 18.2**: Fix Date Extraction and Display Consistency (HIGH PRIORITY) ✅ COMPLETED
-  - Standardize start_time extraction from ElevenLabs API
-  - Ensure UI displays actual call attempt time, not sync time
-  - Success Criteria: UI dates match ElevenLabs UI dates exactly
+- [x] **Task 20.2**: Update processDetailedConversation Method (HIGH PRIORITY) ✅ COMPLETED
+  - Fetch enhanced details and build consolidatedData
+  - Compute call_result using computeOutcomeFrom function
+  - Update call with only call_result (not status or answered)
+  - Replace transcriptions: delete by call_id; insert mapped transcript
+  - Run analysis with new criteria: duration >= 10, message_count >= 2, call_result !== 'failed'
+  - Success Criteria: All final calls processed with detailed data and proper outcome computation
 
-- [x] **Task 18.3**: Investigate and Resolve Duplicate Call Display (MEDIUM PRIORITY) ✅ COMPLETED
-  - Investigate multiple 05/08 calls in UI vs single ElevenLabs call
-  - Verify database uniqueness constraints working properly
-  - Success Criteria: Call count matches between systems
+- [x] **Task 20.3**: Clean Up Unused Methods and Fields (MEDIUM PRIORITY) ✅ COMPLETED
+  - Removed convertConversationToCallData and convertConversationToUpdateData methods
+  - Removed answered field writes and references
+  - Updated needsUpdate method to remove answered field
+  - Updated analysis criteria to use new conditions
+  - Success Criteria: Clean codebase with only call_result field usage
 
-**CRITICAL ISSUES IDENTIFIED**:
-- ❌ **Status Mapping Logic**: Current mapElevenLabsStatus() processes incomplete calls and uses wrong logic
-- ❌ **Date Extraction**: Multiple date sources causing UI/ElevenLabs date mismatch 
-- ❌ **Call Filtering**: Processing in-progress/initiated calls that should be skipped
-- ❌ **Duplicate Display**: Multiple calls showing on same date in UI vs single call in ElevenLabs
-
-**ROOT CAUSES ANALYZED**:
-- **Status Logic**: Maps 'done' to 'completed' instead of duration-based "answered"/"no answer"
-- **Date Sources**: Complex fallback logic using sync time instead of actual call time
-- **Incomplete Filtering**: No logic to skip calls that aren't ready for database storage
-- **Display Logic**: UI shows start_time OR created_at, causing date inconsistencies
+**CRITICAL REQUIREMENTS COMPLETED**:
+- ✅ **Final Call Filtering**: Only process calls with status 'done' or 'failed'
+- ✅ **Minimal Row Creation**: Create minimal rows for new final calls
+- ✅ **Outcome Computation**: Use only call_result field, remove answered dependency
+- ✅ **Analysis Criteria**: Updated analysis conditions to use new criteria
 
 ## Executor's Feedback or Assistance Requests
 
-**Executor Status**: ✅ PHASE 18 COMPLETED - ElevenLabs Sync Data Mapping Fixes
+**Executor Status**: ✅ PHASE 20 COMPLETED - Sync Flow for Final Calls Only
 
-**📊 Current System Status**: Production-ready ElevenLabs voice agent system with streamlined sync flow
+**📊 Current System Status**: Production-ready ElevenLabs voice agent system with comprehensive sync flow
 - ✅ 20 total calls logged with comprehensive metadata
 - ✅ Phone number management with deduplication (12 phone numbers, 14 contacts)
 - ✅ UI/UX improvements with CRM-style design
 - ✅ Automatic call linking and import validation working
-- ✅ **NEW**: Complete implementation of streamlined sync flow with our own outcome computation
-- ✅ **CRITICAL**: Removed dependency on ElevenLabs' call_successful field
+- ✅ ElevenLabs sync data mapping fixes completed
+- ✅ ElevenLabs normalization and outcome computation completed
+- ✅ **NEW**: Complete implementation of sync flow for final calls only
 
-**🎯 Phase 18 Implementation Details**:
-- ✅ **Task 18.1**: Fixed status mapping logic with duration-based computation and call filtering
-- ✅ **Task 18.2**: Standardized start_time extraction from ElevenLabs metadata.start_time_unix_secs
-- ✅ **Task 18.3**: Implemented complete streamlined sync flow with our own outcome fields
+**🎯 Phase 20 Implementation Details**:
+- ✅ **Task 20.1**: Updated processConversation method with new sync flow logic
+- ✅ **Task 20.2**: Updated processDetailedConversation method with proper outcome computation
+- ✅ **Task 20.3**: Cleaned up unused methods and removed answered field dependencies
 
 **🔧 Technical Changes Made**:
-- ✅ Updated ElevenLabs service to normalize conversation objects and remove call_successful dependency
-- ✅ Updated call-sync service with new outcome computation logic (call_result, answered)
-- ✅ Added early skipping of non-final calls (initiated, in-progress, processing)
-- ✅ Updated UI mapCallStatus to use call_result field with proper fallbacks
-- ✅ Updated all analytics queries to use call_result instead of call_successful
-- ✅ Added proper database methods for transcriptions (createTranscriptions, deleteTranscriptionsByCallId)
+- ✅ Updated processConversation() to skip non-final calls and create minimal rows
+- ✅ Updated processDetailedConversation() to use only call_result field
+- ✅ Removed convertConversationToCallData and convertConversationToUpdateData methods
+- ✅ Removed answered field writes and references throughout codebase
+- ✅ Updated analysis criteria to use new conditions: duration >= 10, message_count >= 2, call_result !== 'failed'
+- ✅ Updated needsUpdate method to remove answered field dependency
 
-**📈 Expected Outcomes**:
-- ✅ Only final calls (done/failed) are saved to database
-- ✅ start_time always mirrors ElevenLabs' start time; no more UI mismatch
-- ✅ phone_number will be actual dialed number from details, not 'unknown'
-- ✅ call_result and answered are consistently derived by our rules and shown in UI
-- ✅ No reliance on ElevenLabs' success evaluation; our own analysis runs later
-- ✅ Duplicates prevented via UNIQUE elevenlabs_conversation_id plus proper filtering
+**📈 Expected Outcomes Achieved**:
+- ✅ Only final calls (done/failed) are persisted with minimal data
+- ✅ All final calls processed with detailed data and proper outcome computation
+- ✅ Clean codebase with only call_result field usage
+- ✅ Proper analysis criteria based on duration, message count, and call_result
 
-**Next Steps**: Ready for testing and validation of the new sync flow
+**Next Steps**: Ready for Phase 3 - API and sorting implementation
 
 ## Design Analysis and Recommendations
 
@@ -231,6 +282,7 @@ Fix critical data synchronization issues between ElevenLabs API and Supabase dat
 - ✅ **Flexible Phone Numbers**: Accept international format with or without "+" prefix, auto-convert to standard format.
 - ✅ **Migration Handling**: For existing data, create phone_numbers entries first, with optional contacts for unknown numbers.
 - ✅ **Sequence Concurrency**: Implement queueing to limit simultaneous calls, preventing overload.
+- ✅ **ElevenLabs Sync**: Remove dependency on external call_successful field, implement own outcome computation.
 
 ### 🎯 Future Considerations
 
@@ -242,6 +294,7 @@ Fix critical data synchronization issues between ElevenLabs API and Supabase dat
 - 🎯 **Advanced Sequences**: Rules-based sequencing (e.g., based on time of day).
 - 🎯 **Notes Integration**: Rich text notes with timestamps.
 - 🎯 **Bulk Operations**: For managing multiple contacts/sequences.
+- 🎯 **ElevenLabs Normalization**: Comprehensive data extraction from documented API fields.
 
 
 
