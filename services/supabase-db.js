@@ -1662,7 +1662,11 @@ class SupabaseDBService {
                         id,
                         name,
                         max_attempts,
-                        retry_delay_hours
+                        retry_delay_hours,
+                        timezone,
+                        business_hours_start,
+                        business_hours_end,
+                        exclude_weekends
                     ),
                     phone_numbers (
                         id,
@@ -1698,10 +1702,22 @@ class SupabaseDBService {
      */
     async updateSequenceEntryAfterCall(entryId, callResult) {
         try {
-            // Get current entry
+            // Get current entry with business hours
             const { data: entry, error: entryError } = await this.client
                 .from('sequence_entries')
-                .select('*, sequences(*)')
+                .select(`
+                    *,
+                    sequences (
+                        id,
+                        name,
+                        max_attempts,
+                        retry_delay_hours,
+                        timezone,
+                        business_hours_start,
+                        business_hours_end,
+                        exclude_weekends
+                    )
+                `)
                 .eq('id', entryId)
                 .single();
 
@@ -1723,10 +1739,30 @@ class SupabaseDBService {
                 // Max attempts reached
                 newStatus = 'max_attempts_reached';
             } else {
-                // Schedule next call
-                const nextCall = new Date();
-                nextCall.setHours(nextCall.getHours() + retryDelayHours);
-                nextCallTime = nextCall.toISOString();
+                // Schedule next call with business hours consideration
+                const businessHours = {
+                    timezone: sequence.timezone || 'UTC',
+                    business_hours_start: sequence.business_hours_start || '09:00:00',
+                    business_hours_end: sequence.business_hours_end || '17:00:00',
+                    exclude_weekends: sequence.exclude_weekends !== false // Default to true
+                };
+                
+                // Use business hours service if available, otherwise fallback to simple calculation
+                try {
+                    const BusinessHoursService = require('./business-hours');
+                    const businessHoursService = new BusinessHoursService();
+                    await businessHoursService.initialize();
+                    
+                    const now = new Date();
+                    const nextCall = businessHoursService.addHoursRespectingBusinessHours(now, retryDelayHours, businessHours);
+                    nextCallTime = nextCall.toISOString();
+                } catch (error) {
+                    console.error('Error using business hours service, falling back to simple calculation:', error.message);
+                    // Fallback to simple calculation
+                    const nextCall = new Date();
+                    nextCall.setHours(nextCall.getHours() + retryDelayHours);
+                    nextCallTime = nextCall.toISOString();
+                }
             }
 
             // Update the sequence entry
@@ -1749,6 +1785,207 @@ class SupabaseDBService {
         } catch (error) {
             console.error('Error updating sequence entry:', error.message);
             throw new Error(`Failed to update sequence entry: ${error.message}`);
+        }
+    }
+
+    /**
+     * Update a sequence entry with custom data
+     * @param {string} entryId - Sequence entry ID
+     * @param {Object} updateData - Data to update
+     * @returns {Promise<Object>} Updated sequence entry
+     */
+    async updateSequenceEntry(entryId, updateData) {
+        try {
+            const { data, error } = await this.client
+                .from('sequence_entries')
+                .update(updateData)
+                .eq('id', entryId)
+                .select()
+                .single();
+
+            if (error) throw error;
+            
+            console.log(`✅ Sequence entry updated: ${entryId}`);
+            return data;
+        } catch (error) {
+            console.error('Error updating sequence entry:', error.message);
+            throw new Error(`Failed to update sequence entry: ${error.message}`);
+        }
+    }
+
+    /**
+     * Find all active sequence entries for a given phone number
+     * @param {string} phoneNumber - Phone number to search for
+     * @returns {Promise<Array>} Array of active sequence entries
+     */
+    async findActiveSequenceEntriesForPhoneNumber(phoneNumber) {
+        try {
+            const { data, error } = await this.client
+                .from('sequence_entries')
+                .select(`
+                    *,
+                    sequences (
+                        id,
+                        name,
+                        max_attempts,
+                        retry_delay_hours
+                    ),
+                    phone_numbers (
+                        id,
+                        phone_number,
+                        do_not_call,
+                        contacts (
+                            id,
+                            first_name,
+                            last_name,
+                            company_name
+                        )
+                    )
+                `)
+                .eq('phone_numbers.phone_number', phoneNumber)
+                .eq('status', 'active');
+
+            if (error) throw error;
+            
+            console.log(`✅ Found ${data.length} active sequence entries for ${phoneNumber}`);
+            return data || [];
+        } catch (error) {
+            console.error('Error finding active sequence entries for phone number:', error.message);
+            return [];
+        }
+    }
+
+    /**
+     * Get sequence entries with filters
+     * @param {Object} filters - Filter options
+     * @returns {Promise<Array>} Array of sequence entries
+     */
+    async getSequenceEntries(filters = {}) {
+        try {
+            let query = this.client
+                .from('sequence_entries')
+                .select(`
+                    *,
+                    sequences (
+                        id,
+                        name,
+                        description,
+                        max_attempts,
+                        retry_delay_hours,
+                        is_active
+                    ),
+                    phone_numbers (
+                        id,
+                        phone_number,
+                        do_not_call,
+                        contacts (
+                            id,
+                            first_name,
+                            last_name,
+                            company_name
+                        )
+                    )
+                `)
+                .order('created_at', { ascending: false });
+
+            if (filters.sequenceId) {
+                query = query.eq('sequence_id', filters.sequenceId);
+            }
+
+            if (filters.status) {
+                query = query.eq('status', filters.status);
+            }
+
+            if (filters.phoneNumberId) {
+                query = query.eq('phone_number_id', filters.phoneNumberId);
+            }
+
+            if (filters.limit) {
+                query = query.limit(filters.limit);
+            }
+
+            if (filters.page && filters.limit) {
+                const offset = (filters.page - 1) * filters.limit;
+                query = query.range(offset, offset + filters.limit - 1);
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+            
+            return data || [];
+        } catch (error) {
+            console.error('Error getting sequence entries:', error.message);
+            throw new Error(`Failed to get sequence entries: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get sequence by ID
+     * @param {string} sequenceId - Sequence ID
+     * @returns {Promise<Object>} Sequence details
+     */
+    async getSequenceById(sequenceId) {
+        try {
+            const { data, error } = await this.client
+                .from('sequences')
+                .select('*')
+                .eq('id', sequenceId)
+                .single();
+
+            if (error) throw error;
+            
+            return data;
+        } catch (error) {
+            console.error('Error getting sequence by ID:', error.message);
+            throw new Error(`Failed to get sequence: ${error.message}`);
+        }
+    }
+
+    /**
+     * Update sequence
+     * @param {string} sequenceId - Sequence ID
+     * @param {Object} updateData - Update data
+     * @returns {Promise<Object>} Updated sequence
+     */
+    async updateSequence(sequenceId, updateData) {
+        try {
+            const { data, error } = await this.client
+                .from('sequences')
+                .update(updateData)
+                .eq('id', sequenceId)
+                .select()
+                .single();
+
+            if (error) throw error;
+            
+            console.log(`✅ Sequence updated: ${sequenceId}`);
+            return data;
+        } catch (error) {
+            console.error('Error updating sequence:', error.message);
+            throw new Error(`Failed to update sequence: ${error.message}`);
+        }
+    }
+
+    /**
+     * Delete sequence
+     * @param {string} sequenceId - Sequence ID
+     * @returns {Promise<boolean>} Success status
+     */
+    async deleteSequence(sequenceId) {
+        try {
+            const { error } = await this.client
+                .from('sequences')
+                .delete()
+                .eq('id', sequenceId);
+
+            if (error) throw error;
+            
+            console.log(`✅ Sequence deleted: ${sequenceId}`);
+            return true;
+        } catch (error) {
+            console.error('Error deleting sequence:', error.message);
+            throw new Error(`Failed to delete sequence: ${error.message}`);
         }
     }
 

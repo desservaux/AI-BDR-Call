@@ -1714,10 +1714,157 @@
                     <button class="btn btn-secondary" id="phone-numbers-next-page-btn">Next →</button>
                 </div>
             </div>
+            </div>
+</div>
+
+<!-- Sequence Modal -->
+<div id="sequenceModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="sequenceModalTitle">Add Sequence</h3>
+            <span class="close" onclick="closeSequenceModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="sequenceContent">
+            <form id="sequenceForm">
+                <div class="form-group">
+                    <label for="sequenceName">Name *</label>
+                    <input type="text" id="sequenceName" required>
+                </div>
+                <div class="form-group">
+                    <label for="sequenceDescription">Description</label>
+                    <textarea id="sequenceDescription" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sequenceMaxAttempts">Max Attempts</label>
+                        <input type="number" id="sequenceMaxAttempts" value="3" min="1" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="sequenceRetryDelay">Retry Delay (hours)</label>
+                        <input type="number" id="sequenceRetryDelay" value="24" min="1" max="168">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="sequenceIsActive" checked>
+                        Active
+                    </label>
+                </div>
+                
+                <!-- Business Hours Section -->
+                <div class="business-hours-section">
+                    <h4>Business Hours Configuration</h4>
+                    <div class="form-group">
+                        <label for="sequenceTimezone">Timezone</label>
+                        <select id="sequenceTimezone" required>
+                            <option value="UTC">UTC (Coordinated Universal Time)</option>
+                            <option value="America/New_York">Eastern Time (ET)</option>
+                            <option value="America/Chicago">Central Time (CT)</option>
+                            <option value="America/Denver">Mountain Time (MT)</option>
+                            <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                            <option value="Europe/London">London (GMT/BST)</option>
+                            <option value="Europe/Paris">Paris (CET/CEST)</option>
+                            <option value="Europe/Berlin">Berlin (CET/CEST)</option>
+                            <option value="Asia/Tokyo">Tokyo (JST)</option>
+                            <option value="Asia/Shanghai">Shanghai (CST)</option>
+                            <option value="Australia/Sydney">Sydney (AEST/AEDT)</option>
+                            <option value="Pacific/Auckland">Auckland (NZST/NZDT)</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="sequenceBusinessHoursStart">Start Time</label>
+                            <input type="time" id="sequenceBusinessHoursStart" value="09:00" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="sequenceBusinessHoursEnd">End Time</label>
+                            <input type="time" id="sequenceBusinessHoursEnd" value="17:00" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="sequenceExcludeWeekends" checked>
+                            Exclude Weekends (Saturdays and Sundays)
+                        </label>
+                    </div>
+                    <div class="business-hours-preview">
+                        <div id="businessHoursPreview" class="preview-text">Business Hours: 09:00 - 17:00 UTC (excluding weekends)</div>
+                        <div id="businessHoursValidation" class="validation-message"></div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save Sequence</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeSequenceModal()">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
+</div>
 
-    <script>
+<!-- Sequence Details Modal -->
+<div id="sequenceDetailsModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="sequenceDetailsModalTitle">Sequence Details</h3>
+            <span class="close" onclick="closeSequenceDetailsModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="sequenceDetailsContent">
+            <div class="sequence-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Total Entries:</span>
+                    <span class="stat-value" id="sequenceTotalEntries">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Active:</span>
+                    <span class="stat-value" id="sequenceActiveEntries">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Completed:</span>
+                    <span class="stat-value" id="sequenceCompletedEntries">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Max Attempts:</span>
+                    <span class="stat-value" id="sequenceMaxAttempts">3</span>
+                </div>
+            </div>
+            <div class="sequence-entries">
+                <h4>Sequence Entries</h4>
+                <div class="entries-table" id="sequenceEntriesTable">
+                    <div class="loading">Loading entries...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add to Sequence Modal -->
+<div id="addToSequenceModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add to Sequence</h3>
+            <span class="close" onclick="closeAddToSequenceModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="addToSequenceContent">
+            <div class="form-group">
+                <label for="sequenceSelect">Select Sequence</label>
+                <select id="sequenceSelect" required>
+                    <option value="">Choose a sequence...</option>
+                </select>
+            </div>
+            <div class="selected-items">
+                <h4>Selected Items</h4>
+                <div id="selectedItemsList"></div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary" onclick="addToSequence()">Add to Sequence</button>
+                <button type="button" class="btn btn-secondary" onclick="closeAddToSequenceModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
         // API base URL
         const API_BASE = '';
         
@@ -2896,11 +3043,12 @@
                             <button class="btn btn-small btn-view" onclick="viewSequenceDetails('${sequence.id}')">View</button>
                         </div>
                         <div class="sequence-actions">
+                            <button class="btn btn-small btn-view" onclick="showSequenceDetailsModal('${sequence.id}')">👁️ View</button>
+                            <button class="btn btn-small btn-edit" onclick="editSequence('${sequence.id}')">✏️ Edit</button>
                             <button class="btn btn-small ${sequence.is_active ? 'btn-secondary' : 'btn-primary'}" onclick="toggleSequenceStatus('${sequence.id}', ${!sequence.is_active})">
-                                ${sequence.is_active ? '⏸️' : '▶️'}
+                                ${sequence.is_active ? '⏸️ Pause' : '▶️ Resume'}
                             </button>
-                            <button class="btn btn-small btn-edit" onclick="editSequence('${sequence.id}')">✏️</button>
-                            <button class="btn btn-small btn-delete" onclick="deleteSequence('${sequence.id}')">🗑️</button>
+                            <button class="btn btn-small btn-delete" onclick="deleteSequence('${sequence.id}')">🗑️ Delete</button>
                         </div>
                     </div>
                 `;
@@ -2991,7 +3139,8 @@
                 const callsData = await callsResponse.json();
                 
                 if (callsData.success) {
-                    showCallsModal(phoneNumber, callsData.calls, null);
+                    // Pass the phoneId directly to showCallsModal for sequence lookup
+                    await showCallsModalWithPhoneId(phoneNumber, callsData.calls, phoneId);
                 } else {
                     alert('Error loading calls for this phone number');
                 }
@@ -3033,9 +3182,73 @@
         }
 
         // Show calls modal for a specific phone number
-        function showCallsModal(phoneNumber, calls, contactId) {
+        async function showCallsModal(phoneNumber, calls, contactId) {
             const modal = document.getElementById('callDetailsModal');
             const content = document.getElementById('callDetailsContent');
+            
+            // Get phone number ID to fetch sequence information
+            let phoneNumberId = null;
+            if (contactId) {
+                try {
+                    const phoneResponse = await fetch(`${API_BASE}/api/phone-numbers?contactId=${contactId}&phoneNumber=${phoneNumber}`);
+                    const phoneData = await phoneResponse.json();
+                    if (phoneData.success && phoneData.phoneNumbers.length > 0) {
+                        phoneNumberId = phoneData.phoneNumbers[0].id;
+                    }
+                } catch (error) {
+                    console.error('Error getting phone number ID:', error);
+                }
+            }
+            
+            // Get sequence information if we have a phone number ID
+            let sequenceInfo = '';
+            if (phoneNumberId) {
+                try {
+                    const sequenceResponse = await fetch(`${API_BASE}/api/phone-numbers/${phoneNumberId}/sequences`);
+                    const sequenceData = await sequenceResponse.json();
+                    
+                    if (sequenceData.success && sequenceData.entries.length > 0) {
+                        const entries = sequenceData.entries;
+                        sequenceInfo = `
+                            <div class="sequence-info-section">
+                                <h5>🔄 Sequence Information</h5>
+                                <div class="sequence-entries-list">
+                                    ${entries.map(entry => {
+                                        const sequenceName = entry.sequences?.name || 'Unknown Sequence';
+                                        const statusBadge = `<span class="status-badge ${entry.status}">${entry.status}</span>`;
+                                        const attempts = `${entry.current_attempt}/${entry.sequences?.max_attempts || 3}`;
+                                        const nextCall = entry.next_call_time ? new Date(entry.next_call_time).toLocaleString() : 'N/A';
+                                        
+                                        return `
+                                            <div class="sequence-entry-item">
+                                                <div class="sequence-name">${sequenceName}</div>
+                                                <div class="sequence-status">${statusBadge}</div>
+                                                <div class="sequence-attempts">Attempts: ${attempts}</div>
+                                                <div class="sequence-next-call">Next Call: ${nextCall}</div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        sequenceInfo = `
+                            <div class="sequence-info-section">
+                                <h5>🔄 Sequence Information</h5>
+                                <div class="no-sequence-info">Not in any active sequences</div>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    console.error('Error loading sequence information:', error);
+                    sequenceInfo = `
+                        <div class="sequence-info-section">
+                            <h5>🔄 Sequence Information</h5>
+                            <div class="no-sequence-info">Error loading sequence information</div>
+                        </div>
+                    `;
+                }
+            }
             
             const callsHtml = calls.length > 0 ? calls.map(call => {
                 const statusClass = getStatusClass(call.status);
@@ -3060,6 +3273,103 @@
             content.innerHTML = `
                 <div class="call-detail-section">
                     <h4>📞 Calls for ${phoneNumber}</h4>
+                    ${sequenceInfo}
+                    <div class="calls-table">
+                        <div class="calls-table-header">
+                            <div class="calls-header-left">
+                                <span>Call History</span>
+                                <span class="calls-count">(${calls.length} calls)</span>
+                            </div>
+                        </div>
+                        <div class="calls-table-content">
+                            ${callsHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            modal.style.display = 'block';
+        }
+
+        // Show calls modal with direct phone number ID (for phone numbers tab)
+        async function showCallsModalWithPhoneId(phoneNumber, calls, phoneNumberId) {
+            const modal = document.getElementById('callDetailsModal');
+            const content = document.getElementById('callDetailsContent');
+            
+            // Get sequence information using the direct phone number ID
+            let sequenceInfo = '';
+            if (phoneNumberId) {
+                try {
+                    const sequenceResponse = await fetch(`${API_BASE}/api/phone-numbers/${phoneNumberId}/sequences`);
+                    const sequenceData = await sequenceResponse.json();
+                    
+                    if (sequenceData.success && sequenceData.entries.length > 0) {
+                        const entries = sequenceData.entries;
+                        sequenceInfo = `
+                            <div class="sequence-info-section">
+                                <h5>🔄 Sequence Information</h5>
+                                <div class="sequence-entries-list">
+                                    ${entries.map(entry => {
+                                        const sequenceName = entry.sequences?.name || 'Unknown Sequence';
+                                        const statusBadge = `<span class="status-badge ${entry.status}">${entry.status}</span>`;
+                                        const attempts = `${entry.current_attempt}/${entry.sequences?.max_attempts || 3}`;
+                                        const nextCall = entry.next_call_time ? new Date(entry.next_call_time).toLocaleString() : 'N/A';
+                                        
+                                        return `
+                                            <div class="sequence-entry-item">
+                                                <div class="sequence-name">${sequenceName}</div>
+                                                <div class="sequence-status">${statusBadge}</div>
+                                                <div class="sequence-attempts">Attempts: ${attempts}</div>
+                                                <div class="sequence-next-call">Next Call: ${nextCall}</div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        sequenceInfo = `
+                            <div class="sequence-info-section">
+                                <h5>🔄 Sequence Information</h5>
+                                <div class="no-sequence-info">Not in any active sequences</div>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    console.error('Error loading sequence information:', error);
+                    sequenceInfo = `
+                        <div class="sequence-info-section">
+                            <h5>🔄 Sequence Information</h5>
+                            <div class="no-sequence-info">Error loading sequence information</div>
+                        </div>
+                    `;
+                }
+            }
+            
+            const callsHtml = calls.length > 0 ? calls.map(call => {
+                const statusClass = getStatusClass(call.status);
+                const statusText = getStatusText(call.status);
+                const date = new Date(call.created_at).toLocaleString();
+                const duration = call.duration_seconds ? 
+                    `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s` : 'N/A';
+                
+                return `
+                    <div class="call-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;">
+                        <div class="call-phone">${phoneNumber}</div>
+                        <div class="call-date">${date}</div>
+                        <div class="call-status-badge ${statusClass}">${statusText}</div>
+                        <div class="call-duration">${duration}</div>
+                        <div class="call-actions">
+                            <button class="btn btn-small btn-view" onclick="viewCallDetails('${call.id}')">View</button>
+                        </div>
+                    </div>
+                `;
+            }).join('') : '<div class="no-data">No calls found for this phone number</div>';
+            
+            content.innerHTML = `
+                <div class="call-detail-section">
+                    <h4>📞 Calls for ${phoneNumber}</h4>
+                    ${sequenceInfo}
                     <div class="calls-table">
                         <div class="calls-table-header">
                             <div class="calls-header-left">
@@ -3762,6 +4072,447 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
             window.URL.revokeObjectURL(url);
         }
 
+        // ===== SEQUENCE MODAL FUNCTIONS =====
+
+        // Show sequence modal for adding/editing
+        function showSequenceModal(sequence = null, mode = 'add') {
+            console.log('showSequenceModal called with:', { sequence, mode });
+            
+            const modal = document.getElementById('sequenceModal');
+            const title = document.getElementById('sequenceModalTitle');
+            const form = document.getElementById('sequenceForm');
+            
+            console.log('Modal elements:', { modal, title, form });
+            
+            if (!modal || !title || !form) {
+                console.error('Required modal elements not found');
+                return;
+            }
+            
+            // Reset form
+            form.reset();
+            
+            if (mode === 'edit' && sequence) {
+                console.log('Setting up edit mode with sequence:', sequence);
+                title.textContent = 'Edit Sequence';
+                document.getElementById('sequenceName').value = sequence.name || '';
+                document.getElementById('sequenceDescription').value = sequence.description || '';
+                document.getElementById('sequenceMaxAttempts').value = sequence.max_attempts || 3;
+                document.getElementById('sequenceRetryDelay').value = sequence.retry_delay_hours || 24;
+                document.getElementById('sequenceIsActive').checked = sequence.is_active !== false;
+                
+                // Set business hours fields
+                document.getElementById('sequenceTimezone').value = sequence.timezone || 'UTC';
+                document.getElementById('sequenceBusinessHoursStart').value = sequence.business_hours_start || '09:00';
+                document.getElementById('sequenceBusinessHoursEnd').value = sequence.business_hours_end || '17:00';
+                document.getElementById('sequenceExcludeWeekends').checked = sequence.exclude_weekends !== false;
+                
+                // Update business hours preview
+                updateBusinessHoursPreview();
+                
+                // Store sequence ID for update
+                form.dataset.sequenceId = sequence.id;
+                form.dataset.mode = 'edit';
+            } else {
+                console.log('Setting up add mode');
+                title.textContent = 'Add Sequence';
+                form.dataset.sequenceId = '';
+                form.dataset.mode = 'add';
+                
+                // Set default business hours
+                document.getElementById('sequenceTimezone').value = 'UTC';
+                document.getElementById('sequenceBusinessHoursStart').value = '09:00';
+                document.getElementById('sequenceBusinessHoursEnd').value = '17:00';
+                document.getElementById('sequenceExcludeWeekends').checked = true;
+                
+                // Update business hours preview
+                updateBusinessHoursPreview();
+            }
+            
+            console.log('Showing modal');
+            modal.style.display = 'block';
+        }
+
+        // Close sequence modal
+        function closeSequenceModal() {
+            const modal = document.getElementById('sequenceModal');
+            modal.style.display = 'none';
+        }
+
+        // Show sequence details modal
+        function showSequenceDetailsModal(sequenceId) {
+            const modal = document.getElementById('sequenceDetailsModal');
+            const title = document.getElementById('sequenceDetailsModalTitle');
+            
+            title.textContent = 'Sequence Details';
+            
+            // Load sequence details and entries
+            loadSequenceDetails(sequenceId);
+            
+            modal.style.display = 'block';
+        }
+
+        // Close sequence details modal
+        function closeSequenceDetailsModal() {
+            const modal = document.getElementById('sequenceDetailsModal');
+            modal.style.display = 'none';
+        }
+
+        // Load sequence details
+        async function loadSequenceDetails(sequenceId) {
+            try {
+                const [sequenceResponse, entriesResponse] = await Promise.all([
+                    fetch(`${API_BASE}/api/sequences/${sequenceId}`),
+                    fetch(`${API_BASE}/api/sequences/${sequenceId}/entries`)
+                ]);
+
+                const sequenceData = await sequenceResponse.json();
+                const entriesData = await entriesResponse.json();
+
+                if (sequenceData.success && entriesData.success) {
+                    const sequence = sequenceData.sequence;
+                    const entries = entriesData.entries;
+
+                    // Update stats
+                    document.getElementById('sequenceTotalEntries').textContent = entries.length;
+                    document.getElementById('sequenceActiveEntries').textContent = entries.filter(e => e.status === 'active').length;
+                    document.getElementById('sequenceCompletedEntries').textContent = entries.filter(e => e.status === 'completed').length;
+                    document.getElementById('sequenceMaxAttempts').textContent = sequence.max_attempts;
+
+                    // Update entries table
+                    displaySequenceEntries(entries);
+                }
+            } catch (error) {
+                console.error('Error loading sequence details:', error);
+            }
+        }
+
+        // Display sequence entries
+        function displaySequenceEntries(entries) {
+            const table = document.getElementById('sequenceEntriesTable');
+            
+            if (entries.length === 0) {
+                table.innerHTML = '<div class="no-data">No entries found</div>';
+                return;
+            }
+
+            const entriesHtml = entries.map(entry => {
+                const contact = entry.phone_numbers?.contacts;
+                const contactName = contact ? `${contact.first_name} ${contact.last_name}`.trim() : 'Unknown';
+                const phoneNumber = entry.phone_numbers?.phone_number || 'Unknown';
+                
+                return `
+                    <div class="entry-row">
+                        <div class="entry-cell">${contactName}</div>
+                        <div class="entry-cell">${phoneNumber}</div>
+                        <div class="entry-cell">
+                            <span class="status-badge ${entry.status}">${entry.status}</span>
+                        </div>
+                        <div class="entry-cell">${entry.current_attempt}/${entry.sequences?.max_attempts || 3}</div>
+                        <div class="entry-cell">${entry.next_call_time ? new Date(entry.next_call_time).toLocaleString() : 'N/A'}</div>
+                    </div>
+                `;
+            }).join('');
+
+            table.innerHTML = `
+                <div class="entries-header">
+                    <div class="entry-header-cell">Contact</div>
+                    <div class="entry-header-cell">Phone</div>
+                    <div class="entry-header-cell">Status</div>
+                    <div class="entry-header-cell">Attempts</div>
+                    <div class="entry-header-cell">Next Call</div>
+                </div>
+                ${entriesHtml}
+            `;
+        }
+
+        // Show add to sequence modal
+        function showAddToSequenceModal(selectedItems) {
+            const modal = document.getElementById('addToSequenceModal');
+            const itemsList = document.getElementById('selectedItemsList');
+            
+            // Display selected items
+            const itemsHtml = selectedItems.map(item => {
+                const name = item.name || item.phone_number || 'Unknown';
+                return `<div class="selected-item">${name}</div>`;
+            }).join('');
+            
+            itemsList.innerHTML = itemsHtml;
+            
+            // Load sequences for dropdown
+            loadSequencesForDropdown();
+            
+            modal.style.display = 'block';
+        }
+
+        // Close add to sequence modal
+        function closeAddToSequenceModal() {
+            const modal = document.getElementById('addToSequenceModal');
+            modal.style.display = 'none';
+        }
+
+        // Load sequences for dropdown
+        async function loadSequencesForDropdown() {
+            try {
+                const response = await fetch(`${API_BASE}/api/sequences?isActive=true`);
+                const data = await response.json();
+                
+                const sequenceSelect = document.getElementById('sequenceSelect');
+                sequenceSelect.innerHTML = '<option value="">Choose a sequence...</option>';
+                
+                if (data.success && data.sequences) {
+                    data.sequences.forEach(sequence => {
+                        sequenceSelect.innerHTML += `<option value="${sequence.id}">${sequence.name}</option>`;
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading sequences for dropdown:', error);
+            }
+        }
+
+        // Add to sequence
+        async function addToSequence() {
+            const sequenceId = document.getElementById('sequenceSelect').value;
+            const selectedItems = window.selectedItems || [];
+            
+            if (!sequenceId) {
+                alert('Please select a sequence');
+                return;
+            }
+            
+            if (selectedItems.length === 0) {
+                alert('No items selected');
+                return;
+            }
+            
+            try {
+                const phoneNumberIds = selectedItems.map(item => item.id);
+                
+                const response = await fetch(`${API_BASE}/api/sequences/${sequenceId}/entries`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ phoneNumberIds })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`Successfully added ${data.result.added} items to sequence`);
+                    closeAddToSequenceModal();
+                    
+                    // Refresh current tab
+                    const activeTab = document.querySelector('.tabbar-link.active').getAttribute('data-tab');
+                    if (activeTab === 'contacts') {
+                        loadContacts(1);
+                    } else if (activeTab === 'phone-numbers') {
+                        loadPhoneNumbers(1);
+                    }
+                } else {
+                    alert('Failed to add items to sequence: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error adding to sequence:', error);
+                alert('Failed to add items to sequence');
+            }
+        }
+
+        // Edit sequence
+        async function editSequence(sequenceId) {
+            try {
+                console.log('Edit sequence:', sequenceId);
+                
+                // Fetch sequence details
+                const response = await fetch(`${API_BASE}/api/sequences/${sequenceId}`);
+                console.log('Response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (data.success) {
+                    console.log('Showing sequence modal with data:', data.sequence);
+                    showSequenceModal(data.sequence, 'edit');
+                } else {
+                    console.error('API returned error:', data.message);
+                    alert('Error loading sequence details: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error loading sequence:', error);
+                alert('Error loading sequence details: ' + error.message);
+            }
+        }
+
+        // Delete sequence
+        async function deleteSequence(sequenceId) {
+            if (!confirm('Are you sure you want to delete this sequence? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/sequences/${sequenceId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Sequence deleted successfully');
+                    loadSequences(1);
+                } else {
+                    alert('Failed to delete sequence: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error deleting sequence:', error);
+                alert('Failed to delete sequence');
+            }
+        }
+
+        // Handle sequence form submission
+        document.addEventListener('DOMContentLoaded', () => {
+            const sequenceForm = document.getElementById('sequenceForm');
+            if (sequenceForm) {
+                sequenceForm.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    
+                    const formData = new FormData(sequenceForm);
+                    const sequenceData = {
+                        name: document.getElementById('sequenceName').value,
+                        description: document.getElementById('sequenceDescription').value,
+                        max_attempts: parseInt(document.getElementById('sequenceMaxAttempts').value),
+                        retry_delay_hours: parseInt(document.getElementById('sequenceRetryDelay').value),
+                        is_active: document.getElementById('sequenceIsActive').checked,
+                        timezone: document.getElementById('sequenceTimezone').value,
+                        business_hours_start: document.getElementById('sequenceBusinessHoursStart').value + ':00',
+                        business_hours_end: document.getElementById('sequenceBusinessHoursEnd').value + ':00',
+                        exclude_weekends: document.getElementById('sequenceExcludeWeekends').checked
+                    };
+                    
+                    const mode = sequenceForm.dataset.mode;
+                    const sequenceId = sequenceForm.dataset.sequenceId;
+                    
+                    try {
+                        let response;
+                        if (mode === 'edit') {
+                            response = await fetch(`${API_BASE}/api/sequences/${sequenceId}`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify(sequenceData)
+                            });
+                        } else {
+                            response = await fetch(`${API_BASE}/api/sequences`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify(sequenceData)
+                            });
+                        }
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            alert(mode === 'edit' ? 'Sequence updated successfully' : 'Sequence created successfully');
+                            closeSequenceModal();
+                            loadSequences(1);
+                        } else {
+                            alert('Failed to save sequence: ' + data.message);
+                        }
+                    } catch (error) {
+                        console.error('Error saving sequence:', error);
+                        alert('Failed to save sequence');
+                    }
+                });
+            }
+        });
+
+        // Business Hours Functions
+        function updateBusinessHoursPreview() {
+            const timezone = document.getElementById('sequenceTimezone').value;
+            const startTime = document.getElementById('sequenceBusinessHoursStart').value;
+            const endTime = document.getElementById('sequenceBusinessHoursEnd').value;
+            const excludeWeekends = document.getElementById('sequenceExcludeWeekends').checked;
+            
+            const preview = document.getElementById('businessHoursPreview');
+            const validation = document.getElementById('businessHoursValidation');
+            
+            if (preview) {
+                const timezoneDisplay = timezone.replace('_', ' ').replace('/', ' / ');
+                const weekendText = excludeWeekends ? ' (excluding weekends)' : ' (including weekends)';
+                preview.textContent = `Business Hours: ${startTime} - ${endTime} ${timezoneDisplay}${weekendText}`;
+            }
+            
+            // Validate business hours
+            validateBusinessHours();
+        }
+        
+        async function validateBusinessHours() {
+            const timezone = document.getElementById('sequenceTimezone').value;
+            const startTime = document.getElementById('sequenceBusinessHoursStart').value;
+            const endTime = document.getElementById('sequenceBusinessHoursEnd').value;
+            const excludeWeekends = document.getElementById('sequenceExcludeWeekends').checked;
+            
+            const validation = document.getElementById('businessHoursValidation');
+            
+            if (!validation) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/sequences/validate-business-hours`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        timezone,
+                        business_hours_start: startTime + ':00',
+                        business_hours_end: endTime + ':00',
+                        exclude_weekends: excludeWeekends
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.isValid) {
+                        validation.textContent = '✅ Business hours configuration is valid';
+                        validation.className = 'validation-message success';
+                    } else {
+                        validation.textContent = `❌ ${data.errors.join(', ')}`;
+                        validation.className = 'validation-message error';
+                    }
+                } else {
+                    validation.textContent = `❌ Validation error: ${data.message}`;
+                    validation.className = 'validation-message error';
+                }
+            } catch (error) {
+                validation.textContent = '❌ Error validating business hours';
+                validation.className = 'validation-message error';
+            }
+        }
+        
+        // Add event listeners for business hours fields
+        document.addEventListener('DOMContentLoaded', function() {
+            const timezoneSelect = document.getElementById('sequenceTimezone');
+            const startTimeInput = document.getElementById('sequenceBusinessHoursStart');
+            const endTimeInput = document.getElementById('sequenceBusinessHoursEnd');
+            const excludeWeekendsCheckbox = document.getElementById('sequenceExcludeWeekends');
+            
+            if (timezoneSelect) {
+                timezoneSelect.addEventListener('change', updateBusinessHoursPreview);
+            }
+            if (startTimeInput) {
+                startTimeInput.addEventListener('change', updateBusinessHoursPreview);
+            }
+            if (endTimeInput) {
+                endTimeInput.addEventListener('change', updateBusinessHoursPreview);
+            }
+            if (excludeWeekendsCheckbox) {
+                excludeWeekendsCheckbox.addEventListener('change', updateBusinessHoursPreview);
+            }
+        });
+
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', () => {
             initDashboard();
@@ -3792,6 +4543,22 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
             if (refreshPhoneNumbersBtn) {
                 refreshPhoneNumbersBtn.addEventListener('click', () => {
                     loadPhoneNumbers(1);
+                });
+            }
+            
+            // Add sequence button event listener
+            const addSequenceBtn = document.getElementById('add-sequence-btn');
+            if (addSequenceBtn) {
+                addSequenceBtn.addEventListener('click', () => {
+                    showSequenceModal(null, 'add');
+                });
+            }
+            
+            // Add refresh sequences button event listener
+            const refreshSequencesBtn = document.getElementById('refresh-sequences-btn');
+            if (refreshSequencesBtn) {
+                refreshSequencesBtn.addEventListener('click', () => {
+                    loadSequences(1);
                 });
             }
 
@@ -4060,6 +4827,236 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
             .call-detail-grid {
                 grid-template-columns: 1fr;
             }
+        }
+
+        /* Sequence Modal Styles */
+        .sequence-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .sequence-entries {
+            margin-top: 2rem;
+        }
+
+        .sequence-entries h4 {
+            margin-bottom: 1rem;
+            color: #495057;
+        }
+
+        .entries-table {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .entries-header {
+            display: grid;
+            grid-template-columns: 2fr 2fr 1fr 1fr 2fr;
+            gap: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            font-weight: 600;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .entry-row {
+            display: grid;
+            grid-template-columns: 2fr 2fr 1fr 1fr 2fr;
+            gap: 1rem;
+            padding: 1rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .entry-row:last-child {
+            border-bottom: none;
+        }
+
+        .entry-cell {
+            display: flex;
+            align-items: center;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.completed {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-badge.stopped {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-badge.max_attempts_reached {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .selected-items {
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .selected-items h4 {
+            margin-bottom: 0.5rem;
+            color: #495057;
+        }
+
+        .selected-item {
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+
+        /* Business Hours Styles */
+        .business-hours-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .business-hours-section h4 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .business-hours-preview {
+            margin-top: 15px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+
+        .preview-text {
+            font-size: 0.9rem;
+            color: #495057;
+            font-weight: 500;
+        }
+
+        .validation-message {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .validation-message.error {
+            color: #dc3545;
+        }
+
+        .validation-message.success {
+            color: #28a745;
+        }
+
+        .validation-message.warning {
+            color: #ffc107;
+        }
+
+        /* Sequence Information Styles */
+        .sequence-info-section {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .sequence-info-section h5 {
+            margin-bottom: 1rem;
+            color: #495057;
+            font-size: 1.1rem;
+        }
+
+        .sequence-entries-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .sequence-entry-item {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 2fr;
+            gap: 1rem;
+            padding: 1rem;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            align-items: center;
+        }
+
+        .sequence-name {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .sequence-status {
+            display: flex;
+            justify-content: center;
+        }
+
+        .sequence-attempts {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+
+        .sequence-next-call {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+
+        .no-sequence-info {
+            padding: 1rem;
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
         }
     </style>
 </body>

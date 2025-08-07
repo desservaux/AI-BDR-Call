@@ -116,7 +116,7 @@ CREATE TABLE booking_analysis (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create sequences table for managing call sequences
+-- Create sequences table for managing call sequences with business hours
 CREATE TABLE sequences (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
@@ -124,6 +124,10 @@ CREATE TABLE sequences (
     max_attempts INTEGER DEFAULT 3,
     retry_delay_hours INTEGER DEFAULT 24,
     is_active BOOLEAN DEFAULT TRUE,
+    timezone TEXT DEFAULT 'UTC',
+    business_hours_start TIME DEFAULT '09:00:00',
+    business_hours_end TIME DEFAULT '17:00:00',
+    exclude_weekends BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -175,6 +179,9 @@ CREATE INDEX idx_booking_analysis_person_very_upset ON booking_analysis(person_v
 
 CREATE INDEX idx_sequences_name ON sequences(name);
 CREATE INDEX idx_sequences_is_active ON sequences(is_active);
+CREATE INDEX idx_sequences_timezone ON sequences(timezone);
+CREATE INDEX idx_sequences_business_hours ON sequences(business_hours_start, business_hours_end);
+CREATE INDEX idx_sequences_exclude_weekends ON sequences(exclude_weekends);
 
 CREATE INDEX idx_sequence_entries_sequence_id ON sequence_entries(sequence_id);
 CREATE INDEX idx_sequence_entries_phone_number_id ON sequence_entries(phone_number_id);

@@ -706,7 +706,7 @@ app.delete('/api/contacts/:contactId', async (req, res) => {
 // Create new contact
 app.post('/api/contacts', async (req, res) => {
     try {
-        const { first_name, last_name, email, company_name, position, notes } = req.body;
+        const { first_name, last_name, email, company_name, position, notes, do_not_call } = req.body;
         
         console.log(`➕ Creating new contact: ${first_name} ${last_name}`);
         
@@ -716,7 +716,8 @@ app.post('/api/contacts', async (req, res) => {
             email,
             company_name,
             position,
-            notes
+            notes,
+            do_not_call: do_not_call || false
         });
         
         res.json({
@@ -996,16 +997,52 @@ app.get('/api/sequences', async (req, res) => {
 // Create new sequence
 app.post('/api/sequences', async (req, res) => {
     try {
-        const { name, description, max_attempts, retry_delay_hours, is_active } = req.body;
+        const { 
+            name, 
+            description, 
+            max_attempts, 
+            retry_delay_hours, 
+            is_active,
+            timezone,
+            business_hours_start,
+            business_hours_end,
+            exclude_weekends
+        } = req.body;
         
         console.log(`➕ Creating new sequence: ${name}`);
+        
+        // Validate business hours if provided
+        if (timezone || business_hours_start || business_hours_end) {
+            const BusinessHoursService = require('./services/business-hours');
+            const businessHoursService = new BusinessHoursService();
+            await businessHoursService.initialize();
+            
+            const businessHours = {
+                timezone: timezone || 'UTC',
+                business_hours_start: business_hours_start || '09:00:00',
+                business_hours_end: business_hours_end || '17:00:00',
+                exclude_weekends: exclude_weekends !== false // Default to true
+            };
+            
+            const validation = businessHoursService.validateBusinessHours(businessHours);
+            if (!validation.isValid) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Invalid business hours configuration: ${validation.errors.join(', ')}`
+                });
+            }
+        }
         
         const sequence = await supabaseDb.createSequence({
             name,
             description,
             max_attempts: max_attempts || 3,
             retry_delay_hours: retry_delay_hours || 24,
-            is_active: is_active !== undefined ? is_active : true
+            is_active: is_active !== undefined ? is_active : true,
+            timezone: timezone || 'UTC',
+            business_hours_start: business_hours_start || '09:00:00',
+            business_hours_end: business_hours_end || '17:00:00',
+            exclude_weekends: exclude_weekends !== false // Default to true
         });
         
         res.json({
@@ -1164,6 +1201,275 @@ app.post('/api/sequences/entries/:entryId/update-after-call', async (req, res) =
         res.status(500).json({
             success: false,
             message: `Failed to update sequence entry: ${error.message}`
+        });
+    }
+});
+
+// Get sequence by ID
+app.get('/api/sequences/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        console.log(`📋 Fetching sequence details: ${id}`);
+        
+        const sequence = await supabaseDb.getSequenceById(id);
+        
+        if (!sequence) {
+            return res.status(404).json({
+                success: false,
+                message: 'Sequence not found'
+            });
+        }
+        
+        res.json({
+            success: true,
+            sequence: sequence
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching sequence:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Failed to fetch sequence: ${error.message}`
+        });
+    }
+});
+
+// Update sequence
+app.put('/api/sequences/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { 
+            name, 
+            description, 
+            max_attempts, 
+            retry_delay_hours, 
+            is_active,
+            timezone,
+            business_hours_start,
+            business_hours_end,
+            exclude_weekends
+        } = req.body;
+        
+        console.log(`✏️ Updating sequence: ${id}`);
+        
+        // Validate business hours if provided
+        if (timezone || business_hours_start || business_hours_end) {
+            const BusinessHoursService = require('./services/business-hours');
+            const businessHoursService = new BusinessHoursService();
+            await businessHoursService.initialize();
+            
+            const businessHours = {
+                timezone: timezone || 'UTC',
+                business_hours_start: business_hours_start || '09:00:00',
+                business_hours_end: business_hours_end || '17:00:00',
+                exclude_weekends: exclude_weekends !== false // Default to true
+            };
+            
+            const validation = businessHoursService.validateBusinessHours(businessHours);
+            if (!validation.isValid) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Invalid business hours configuration: ${validation.errors.join(', ')}`
+                });
+            }
+        }
+        
+        const sequence = await supabaseDb.updateSequence(id, {
+            name,
+            description,
+            max_attempts,
+            retry_delay_hours,
+            is_active,
+            timezone,
+            business_hours_start,
+            business_hours_end,
+            exclude_weekends
+        });
+        
+        res.json({
+            success: true,
+            sequence: sequence,
+            message: 'Sequence updated successfully'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error updating sequence:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Failed to update sequence: ${error.message}`
+        });
+    }
+});
+
+// Delete sequence
+app.delete('/api/sequences/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        console.log(`🗑️ Deleting sequence: ${id}`);
+        
+        await supabaseDb.deleteSequence(id);
+        
+        res.json({
+            success: true,
+            message: 'Sequence deleted successfully'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error deleting sequence:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Failed to delete sequence: ${error.message}`
+        });
+    }
+});
+
+// Validate business hours configuration
+app.post('/api/sequences/validate-business-hours', async (req, res) => {
+    try {
+        const { timezone, business_hours_start, business_hours_end, exclude_weekends } = req.body;
+        
+        console.log(`🔍 Validating business hours configuration`);
+        
+        const BusinessHoursService = require('./services/business-hours');
+        const businessHoursService = new BusinessHoursService();
+        await businessHoursService.initialize();
+        
+        const businessHours = {
+            timezone: timezone || 'UTC',
+            business_hours_start: business_hours_start || '09:00:00',
+            business_hours_end: business_hours_end || '17:00:00',
+            exclude_weekends: exclude_weekends !== false // Default to true
+        };
+        
+        const validation = businessHoursService.validateBusinessHours(businessHours);
+        
+        res.json({
+            success: true,
+            isValid: validation.isValid,
+            errors: validation.errors,
+            formattedHours: businessHoursService.formatBusinessHours(businessHours)
+        });
+        
+    } catch (error) {
+        console.error('❌ Error validating business hours:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Failed to validate business hours: ${error.message}`
+        });
+    }
+});
+
+// Get common timezones
+app.get('/api/timezones', async (req, res) => {
+    try {
+        const commonTimezones = [
+            { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
+            { value: 'America/New_York', label: 'Eastern Time (ET)' },
+            { value: 'America/Chicago', label: 'Central Time (CT)' },
+            { value: 'America/Denver', label: 'Mountain Time (MT)' },
+            { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+            { value: 'Europe/London', label: 'London (GMT/BST)' },
+            { value: 'Europe/Paris', label: 'Paris (CET/CEST)' },
+            { value: 'Europe/Berlin', label: 'Berlin (CET/CEST)' },
+            { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+            { value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
+            { value: 'Australia/Sydney', label: 'Sydney (AEST/AEDT)' },
+            { value: 'Pacific/Auckland', label: 'Auckland (NZST/NZDT)' }
+        ];
+        
+        res.json({
+            success: true,
+            timezones: commonTimezones
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching timezones:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Failed to fetch timezones: ${error.message}`
+        });
+    }
+});
+
+// Get sequence entries
+app.get('/api/sequences/:id/entries', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, page, limit } = req.query;
+        
+        console.log(`📋 Fetching entries for sequence: ${id}`);
+        
+        const entries = await supabaseDb.getSequenceEntries({
+            sequenceId: id,
+            status: status || null,
+            page: page ? parseInt(page) : 1,
+            limit: limit ? parseInt(limit) : 50
+        });
+        
+        res.json({
+            success: true,
+            entries: entries,
+            count: entries.length
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching sequence entries:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Failed to fetch sequence entries: ${error.message}`
+        });
+    }
+});
+
+// Add multiple phone numbers to sequence
+app.post('/api/sequences/:id/entries', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { phoneNumberIds } = req.body;
+        
+        console.log(`➕ Adding ${phoneNumberIds.length} phone numbers to sequence: ${id}`);
+        
+        const result = await supabaseDb.addPhoneNumbersToSequence(id, phoneNumberIds);
+        
+        res.json({
+            success: true,
+            result: result,
+            message: `Added ${result.added} phone numbers to sequence`
+        });
+        
+    } catch (error) {
+        console.error('❌ Error adding phone numbers to sequence:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Failed to add phone numbers to sequence: ${error.message}`
+        });
+    }
+});
+
+// Get phone number sequences
+app.get('/api/phone-numbers/:id/sequences', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        console.log(`📋 Fetching sequences for phone number: ${id}`);
+        
+        const entries = await supabaseDb.getSequenceEntries({
+            phoneNumberId: id
+        });
+        
+        res.json({
+            success: true,
+            entries: entries,
+            count: entries.length
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching phone number sequences:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Failed to fetch phone number sequences: ${error.message}`
         });
     }
 });

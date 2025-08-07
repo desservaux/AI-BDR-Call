@@ -66,16 +66,32 @@ async function runMigration() {
         }
         console.log('✅ Phone_numbers table created');
 
-        // Create sequences table
+        // Drop and recreate sequences table with business hours support (not in production)
+        console.log('🗑️ Dropping existing sequences table...');
+        const { error: dropSequencesError } = await supabase.rpc('exec_sql', {
+            sql: `DROP TABLE IF EXISTS sequences CASCADE;`
+        });
+        
+        if (dropSequencesError) {
+            console.error('❌ Error dropping sequences table:', dropSequencesError);
+            return;
+        }
+        console.log('✅ Sequences table dropped');
+
+        // Create sequences table with business hours support
         const { error: sequencesError } = await supabase.rpc('exec_sql', {
             sql: `
-                CREATE TABLE IF NOT EXISTS sequences (
+                CREATE TABLE sequences (
                     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
                     name TEXT NOT NULL,
                     description TEXT,
                     max_attempts INTEGER DEFAULT 3,
                     retry_delay_hours INTEGER DEFAULT 24,
                     is_active BOOLEAN DEFAULT TRUE,
+                    timezone TEXT DEFAULT 'UTC',
+                    business_hours_start TIME DEFAULT '09:00:00',
+                    business_hours_end TIME DEFAULT '17:00:00',
+                    exclude_weekends BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 );
@@ -151,6 +167,9 @@ async function runMigration() {
                 
                 CREATE INDEX IF NOT EXISTS idx_sequences_name ON sequences(name);
                 CREATE INDEX IF NOT EXISTS idx_sequences_is_active ON sequences(is_active);
+                CREATE INDEX IF NOT EXISTS idx_sequences_timezone ON sequences(timezone);
+                CREATE INDEX IF NOT EXISTS idx_sequences_business_hours ON sequences(business_hours_start, business_hours_end);
+                CREATE INDEX IF NOT EXISTS idx_sequences_exclude_weekends ON sequences(exclude_weekends);
                 
                 CREATE INDEX IF NOT EXISTS idx_sequence_entries_sequence_id ON sequence_entries(sequence_id);
                 CREATE INDEX IF NOT EXISTS idx_sequence_entries_phone_number_id ON sequence_entries(phone_number_id);

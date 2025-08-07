@@ -318,6 +318,17 @@ s    }
             } else {
                 console.log(`⏭️ Skipping Gemini analysis for call ${callId}: ${this.getSkipReason(consolidatedData)}`);
             }
+
+            // PHASE 23: Duration-based cleanup trigger
+            const DURATION_THRESHOLD_SECONDS = 7;
+            if (consolidatedData.duration && consolidatedData.duration > DURATION_THRESHOLD_SECONDS) {
+                console.log(`✅ Call duration (${consolidatedData.duration}s) exceeded threshold. Triggering sequence cleanup for ${consolidatedData.to_number}.`);
+                try {
+                    await this.sequenceManager.handleSuccessfulCall(consolidatedData.to_number);
+                } catch (cleanupError) {
+                    console.warn(`⚠️ Sequence cleanup failed for ${consolidatedData.to_number}:`, cleanupError.message);
+                }
+            }
         } catch (error) {
             console.error(`❌ Error processing detailed conversation ${conversationId}:`, error.message);
             throw error;
