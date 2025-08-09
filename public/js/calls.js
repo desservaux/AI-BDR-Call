@@ -44,7 +44,10 @@ function renderCalls(calls) {
   `;
   container.innerHTML = tableHTML;
   container.querySelectorAll('button[data-action="view"]').forEach((btn) => {
-    btn.addEventListener('click', () => window.viewCallDetails?.(btn.dataset.id));
+    btn.addEventListener('click', async () => {
+      const { viewCallDetails } = await import('./callDetails.js');
+      viewCallDetails(btn.dataset.id);
+    });
   });
 }
 

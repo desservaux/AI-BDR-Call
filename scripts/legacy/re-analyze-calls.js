@@ -1,6 +1,7 @@
 require('dotenv').config();
 
-const supabaseDb = require('./services/supabase-db');
+const DbService = require('./services/db/DbService');
+const supabaseDb = new DbService();
 const elevenLabsService = require('./services/elevenlabs');
 const geminiService = require('./services/gemini-analysis');
 

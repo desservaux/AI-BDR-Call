@@ -1,4 +1,4 @@
-const { toZonedTime, fromZonedTime } = require('date-fns-tz');
+const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
 
 /**
  * Business Hours Utility Service

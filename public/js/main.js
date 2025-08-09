@@ -5,7 +5,12 @@ import { bindCallsTab, loadCalls, bindCallSearch } from './calls.js';
 import { bindContactsTab, loadContacts } from './contacts.js';
 import { bindSequencesTab, loadSequences } from './sequences.js';
 import { bindPhoneNumbersTab, loadPhoneNumbers } from './phoneNumbers.js';
-import './callDetails.js';
+import { bindCallDetailsModal } from './callDetails.js';
+import { bindSequenceModals, wireViewButtons } from './sequenceModals.js';
+import { bindBusinessHoursPreview } from './businessHours.js';
+import { bindUploadModal } from './uploadModal.js';
+import { bindCallForm } from './callForm.js';
+import { bindGlobalActions } from './actions.js';
 
 function initTabs() {
   const tabLinks = document.querySelectorAll('.tabbar-link');
@@ -54,6 +59,12 @@ window.addEventListener('DOMContentLoaded', () => {
   bindSequencesTab();
   bindPhoneNumbersTab();
   bindCallSearch();
+  bindSequenceModals();
+  bindBusinessHoursPreview();
+  wireViewButtons();
+  bindUploadModal();
+  bindCallForm();
+  bindGlobalActions();
   const refreshAnalyticsBtn = document.getElementById('refresh-analytics-btn');
   if (refreshAnalyticsBtn) {
     refreshAnalyticsBtn.addEventListener('click', loadAnalytics);
@@ -66,5 +77,6 @@ window.addEventListener('DOMContentLoaded', () => {
   loadContacts();
   loadSequences();
   loadPhoneNumbers();
+  bindCallDetailsModal();
 });
 

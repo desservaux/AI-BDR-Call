@@ -44,6 +44,23 @@ export async function viewCallDetails(callId) {
   else content.innerHTML = '<div class="no-data">Error loading call details</div>';
 }
 
-// Provide global shim for existing inline onclick usage
-window.viewCallDetails = viewCallDetails;
+export function bindCallDetailsModal() {
+  const modal = document.getElementById('callDetailsModal');
+  const x = modal?.querySelector('.close');
+  x?.addEventListener('click', () => {
+    modal.style.display = 'none';
+  });
+  const c1 = document.getElementById('close-call-details-btn-1');
+  const c2 = document.getElementById('close-call-details-btn-2');
+  c1?.addEventListener('click', () => { modal.style.display = 'none'; });
+  c2?.addEventListener('click', () => { modal.style.display = 'none'; });
+  // Also close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal?.style.display === 'block') {
+      modal.style.display = 'none';
+    }
+  });
+}
+
+// Shim no longer required; all bindings done via modules
 

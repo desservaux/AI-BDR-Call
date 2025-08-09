@@ -1,11 +1,11 @@
-const SupabaseDBService = require('./supabase-db');
+const DbService = require('./db/DbService');
 const elevenLabsService = require('./elevenlabs');
 const BusinessHoursService = require('./business-hours');
 const SequenceService = require('./sequences/SequenceService');
 
 class SequenceManagerService {
     constructor() {
-        this.dbService = new SupabaseDBService();
+        this.dbService = new DbService();
         this.businessHoursService = new BusinessHoursService();
         this.sequenceService = new SequenceService();
         this.initialized = false;

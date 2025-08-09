@@ -1,4 +1,5 @@
-const supabaseDb = require('./services/supabase-db');
+const DbService = require('./services/db/DbService');
+const supabaseDb = new DbService();
 const elevenLabsService = require('./services/elevenlabs');
 
 // Initialize the database service

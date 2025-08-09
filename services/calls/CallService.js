@@ -1,8 +1,8 @@
-const SupabaseDBService = require('../supabase-db');
+const DbService = require('../db/DbService');
 
 class CallService {
   constructor() {
-    this.db = new SupabaseDBService();
+    this.db = new DbService();
   }
 
   async testConnection() {

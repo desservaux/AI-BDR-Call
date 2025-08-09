@@ -28,6 +28,10 @@ function renderSequences(sequences) {
     })
     .join('');
   container.innerHTML = html;
+  // mark buttons for JS binding instead of inline onclicks
+  container.querySelectorAll('button[data-action="view"]').forEach((btn)=>{
+    btn.setAttribute('data-action','view-sequence');
+  });
 }
 
 export async function loadSequences() {

@@ -1,6 +1,7 @@
 require('dotenv').config();
 
-const supabaseDb = require('./services/supabase-db');
+const DbService = require('./services/db/DbService');
+const supabaseDb = new DbService();
 
 async function testGetCalls() {
     console.log('🧪 Testing getCalls...');

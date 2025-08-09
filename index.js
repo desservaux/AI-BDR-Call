@@ -12,12 +12,12 @@ dotenv.config();
 // Import services
 const elevenLabsService = require('./services/elevenlabs'); // ElevenLabs integration
 const callSync = require('./services/call-sync'); // Call sync service (already instantiated)
-const SupabaseDBService = require('./services/supabase-db'); // Database service
+const DbService = require('./services/db/DbService'); // Database service
 const CallService = require('./services/calls/CallService');
 const SequenceService = require('./services/sequences/SequenceService');
 
 // Initialize services
-const supabaseDb = new SupabaseDBService();
+const supabaseDb = new DbService();
 const callService = new CallService();
 const sequenceService = new SequenceService();
 
