@@ -1864,6 +1864,8 @@
     </div>
 </div>
 
+<script type="module" src="/public/js/main.js"></script>
+<!-- Legacy inline script retained below; will be incrementally migrated to modules -->
 <script>
         // API base URL
         const API_BASE = '';
@@ -1999,7 +2001,7 @@
                     
                     if (filteredCalls.length > 0) {
                         displayCalls(filteredCalls);
-                        updatePaginationWithBackendData(totalPages, totalCalls);
+                        updatePagination(totalPages, totalCalls);
                     } else {
                         callsTableContent.innerHTML = '<div class="no-data">No calls found</div>';
                         hidePagination();
@@ -2109,8 +2111,14 @@
             }
         }
         
-        // Update pagination controls with backend data
-        function updatePaginationWithBackendData(totalPages, totalCalls) {
+        // Update pagination controls
+        function updatePagination(totalPages = null, totalCalls = null) {
+            // If no parameters provided, calculate from filtered calls (search mode)
+            if (totalPages === null) {
+                totalPages = Math.ceil(filteredCalls.length / itemsPerPage);
+                totalCalls = filteredCalls.length;
+            }
+            
             const paginationControls = document.getElementById('pagination-controls');
             const pageNumbers = document.getElementById('page-numbers');
             const prevBtn = document.getElementById('prev-page-btn');
@@ -2128,49 +2136,12 @@
             prevBtn.disabled = currentPage <= 1;
             nextBtn.disabled = currentPage >= totalPages;
             
-            // Update pagination info
-            if (paginationInfo) {
+            // Update pagination info if available
+            if (paginationInfo && totalCalls !== null) {
                 const startIndex = (currentPage - 1) * itemsPerPage + 1;
                 const endIndex = Math.min(currentPage * itemsPerPage, totalCalls);
                 paginationInfo.textContent = `Showing ${startIndex}-${endIndex} of ${totalCalls}`;
             }
-            
-            // Generate page numbers
-            let pageNumbersHTML = '';
-            const maxVisiblePages = 5;
-            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-            
-            if (endPage - startPage + 1 < maxVisiblePages) {
-                startPage = Math.max(1, endPage - maxVisiblePages + 1);
-            }
-            
-            for (let i = startPage; i <= endPage; i++) {
-                const isActive = i === currentPage;
-                pageNumbersHTML += `<button class="page-number ${isActive ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
-            }
-            
-            pageNumbers.innerHTML = pageNumbersHTML;
-        }
-        
-        // Update pagination controls (legacy function for search)
-        function updatePagination() {
-            const totalPages = Math.ceil(filteredCalls.length / itemsPerPage);
-            const paginationControls = document.getElementById('pagination-controls');
-            const pageNumbers = document.getElementById('page-numbers');
-            const prevBtn = document.getElementById('prev-page-btn');
-            const nextBtn = document.getElementById('next-page-btn');
-            
-            if (totalPages <= 1) {
-                hidePagination();
-                return;
-            }
-            
-            paginationControls.style.display = 'flex';
-            
-            // Update previous/next buttons
-            prevBtn.disabled = currentPage <= 1;
-            nextBtn.disabled = currentPage >= totalPages;
             
             // Generate page numbers
             let pageNumbersHTML = '';
@@ -3493,12 +3464,12 @@
 
         function editSequence(sequenceId) {
             console.log('Edit sequence:', sequenceId);
-            // TODO: Implement sequence editing
+            // Sequence editing can be implemented here if required
         }
 
         function deleteSequence(sequenceId) {
             console.log('Delete sequence:', sequenceId);
-            // TODO: Implement sequence deletion
+            // Sequence deletion can be implemented here if required
         }
 
         // Load sequence statistics
@@ -3623,7 +3594,7 @@
                 
                 if (data.success && data.queue.length > 0) {
                     alert(`Starting batch calling with ${data.queue.length} entries`);
-                    // TODO: Implement actual batch calling logic
+                    // Batch calling logic placeholder; integrate with backend queue when ready
                 } else {
                     alert('No entries ready for calling');
                 }

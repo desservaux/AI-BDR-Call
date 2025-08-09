@@ -1,4 +1,4 @@
-const { toZonedTime, fromZonedTime, format } = require('date-fns-tz');
+const { toZonedTime, fromZonedTime } = require('date-fns-tz');
 
 /**
  * Business Hours Utility Service
@@ -28,7 +28,7 @@ class BusinessHoursService {
         if (!timezone) {
             errors.push('Timezone is required');
         } else {
-            // For now, accept common timezones without strict validation
+            // Accept common timezones without strict validation
             // This avoids issues with date-fns-tz timezone validation
             const commonTimezones = [
                 'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',

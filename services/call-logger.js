@@ -1,10 +1,10 @@
 const elevenLabsService = require('./elevenlabs');
-const SupabaseDBService = require('./supabase-db');
+const CallService = require('./calls/CallService');
 
 class CallLoggerService {
     constructor() {
         this.elevenLabsService = elevenLabsService; // Use the exported instance
-        this.dbService = new SupabaseDBService();
+        this.dbService = new CallService();
         this.activeCalls = new Map(); // Track active calls
         this.callEventQueue = new Map(); // Queue events for processing
     }

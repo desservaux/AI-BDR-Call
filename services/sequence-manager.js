@@ -1,11 +1,13 @@
 const SupabaseDBService = require('./supabase-db');
 const elevenLabsService = require('./elevenlabs');
 const BusinessHoursService = require('./business-hours');
+const SequenceService = require('./sequences/SequenceService');
 
 class SequenceManagerService {
     constructor() {
         this.dbService = new SupabaseDBService();
         this.businessHoursService = new BusinessHoursService();
+        this.sequenceService = new SequenceService();
         this.initialized = false;
     }
 
@@ -25,6 +27,7 @@ class SequenceManagerService {
 
             // Initialize business hours service
             await this.businessHoursService.initialize();
+            await this.sequenceService.initialize();
 
             console.log('✅ Sequence Manager Service initialized successfully');
             this.initialized = true;
@@ -100,27 +103,12 @@ class SequenceManagerService {
                         results.errors.push(`Call to ${phoneNumber}: ${callResult.error}`);
                     }
 
-                    // Immediately update sequence entry with next attempt scheduling
-                    const nextAttempt = entry.current_attempt + 1;
-                    
-                    // Get business hours from sequence
-                    const businessHours = {
-                        timezone: entry.sequences.timezone || 'UTC',
-                        business_hours_start: entry.sequences.business_hours_start || '09:00:00',
-                        business_hours_end: entry.sequences.business_hours_end || '17:00:00',
-                        exclude_weekends: entry.sequences.exclude_weekends !== false // Default to true
-                    };
-                    
-                    const nextCallTime = this.calculateNextCallTime(entry.sequences.retry_delay_hours, businessHours);
-                    
-                    await this.dbService.updateSequenceEntryAfterCall(entry.id, {
-                        successful: callResult.success,
-                        current_attempt: nextAttempt,
-                        next_call_time: nextCallTime,
-                        status: nextAttempt >= entry.sequences.max_attempts ? 'max_attempts_reached' : 'active'
+                    // Immediately update sequence entry with centralized service
+                    const updatedEntry = await this.sequenceService.updateAfterCall(entry.id, {
+                        successful: callResult.success
                     });
 
-                    console.log(`📅 Scheduled next attempt for ${phoneNumber} at ${nextCallTime}`);
+                    console.log(`📅 Scheduled next attempt for ${phoneNumber} at ${updatedEntry?.next_call_time || 'n/a'}`);
 
                 } catch (error) {
                     console.error(`❌ Error processing sequence entry ${entry.id}:`, error.message);
@@ -229,7 +217,7 @@ class SequenceManagerService {
      * @param {Object} businessHours - Business hours configuration (optional)
      * @returns {string} ISO string for next call time
      */
-    calculateNextCallTime(retryDelayHours = 24, businessHours = null) {
+    calculateNextCallTimeWithBusinessHours(retryDelayHours = 24, businessHours = null) {
         const now = new Date();
         
         if (businessHours) {

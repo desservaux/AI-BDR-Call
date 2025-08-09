@@ -1,12 +1,25 @@
-const { createClient } = require('@supabase/supabase-js');
 const XLSX = require('xlsx');
+const getSupabaseClient = require('./db/dbClient');
+const CallsRepo = require('./db/CallsRepo');
+const TranscriptionsRepo = require('./db/TranscriptionsRepo');
+const EventsRepo = require('./db/EventsRepo');
+const BookingAnalysisRepo = require('./db/BookingAnalysisRepo');
+const ContactsRepo = require('./db/ContactsRepo');
+const PhoneNumbersRepo = require('./db/PhoneNumbersRepo');
+const SequencesRepo = require('./db/SequencesRepo');
+const SequenceEntriesRepo = require('./db/SequenceEntriesRepo');
 
 class SupabaseDBService {
     constructor() {
-        this.supabaseUrl = process.env.SUPABASE_URL || 'https://elvnlecliyhdlflzmzeh.supabase.co';
-        this.supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsdm5sZWNsaXloZGxmbHptemVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MjEyODgsImV4cCI6MjA2OTI5NzI4OH0.SOds2z36iJuHv4tSusH1vlSqUNLM6oT9oFpBy2bL624';
-        
-        this.client = createClient(this.supabaseUrl, this.supabaseKey);
+        this.client = getSupabaseClient();
+        this.callsRepo = new CallsRepo();
+        this.transcriptionsRepo = new TranscriptionsRepo();
+        this.eventsRepo = new EventsRepo();
+        this.bookingAnalysisRepo = new BookingAnalysisRepo();
+        this.contactsRepo = new ContactsRepo();
+        this.phoneNumbersRepo = new PhoneNumbersRepo();
+        this.sequencesRepo = new SequencesRepo();
+        this.sequenceEntriesRepo = new SequenceEntriesRepo();
     }
 
     /**
@@ -37,146 +50,7 @@ class SupabaseDBService {
      */
     async createCall(callData) {
         try {
-            const phoneNumber = callData.phoneNumber || callData.phone_number;
-            
-            if (!phoneNumber) {
-                throw new Error('Phone number is required for call creation');
-            }
-
-            // Ensure phone number record exists (UPSERT)
-            let phoneNumberId = null;
-            try {
-                // Try to find existing phone number
-                const { data: existingPhone, error: findError } = await this.client
-                    .from('phone_numbers')
-                    .select('id')
-                    .eq('phone_number', phoneNumber)
-                    .single();
-
-                if (findError && findError.code !== 'PGRST116') { // PGRST116 = no rows returned
-                    throw findError;
-                }
-
-                if (existingPhone) {
-                    phoneNumberId = existingPhone.id;
-                } else {
-                    // Create new phone number record using UPSERT
-                    const { data: newPhone, error: createError } = await this.client
-                        .from('phone_numbers')
-                        .upsert([{
-                            phone_number: phoneNumber,
-                            phone_type: 'mobile',
-                            is_primary: true,
-                            do_not_call: false
-                        }], {
-                            onConflict: 'phone_number',
-                            ignoreDuplicates: false
-                        })
-                        .select('id')
-                        .single();
-
-                    if (createError) throw createError;
-                    phoneNumberId = newPhone.id;
-                }
-            } catch (error) {
-                console.error('Error ensuring phone number exists:', error.message);
-                // Continue without phone_number_id if there's an error
-            }
-
-            // Prepare call data with all possible fields
-            const insertData = {
-                phone_number: phoneNumber,
-                phone_number_id: phoneNumberId,
-                chat_id: callData.chatId, // Keep for backward compatibility
-                chat_group_id: callData.chatGroupId, // Keep for backward compatibility
-                status: callData.status || 'active',
-                // Sequence tracking fields
-                call_attempts: callData.call_attempts || 1,
-                last_call_time: callData.last_call_time || new Date().toISOString(),
-                next_call_time: callData.next_call_time,
-                sequence_status: callData.sequence_status || 'active',
-                created_at: callData.created_at || new Date().toISOString()
-            };
-
-            // Add ElevenLabs specific fields if available
-            if (callData.elevenlabs_conversation_id) {
-                insertData.elevenlabs_conversation_id = callData.elevenlabs_conversation_id;
-            }
-            if (callData.agent_id) {
-                insertData.agent_id = callData.agent_id;
-            }
-            if (callData.agent_name) {
-                insertData.agent_name = callData.agent_name;
-            }
-            if (callData.call_result) {
-                insertData.call_result = callData.call_result;
-            }
-            if (callData.answered !== undefined) {
-                insertData.answered = callData.answered;
-            }
-            if (callData.duration_seconds) {
-                insertData.duration_seconds = callData.duration_seconds;
-            }
-            if (callData.message_count) {
-                insertData.message_count = callData.message_count;
-            }
-            if (callData.start_time) {
-                insertData.start_time = callData.start_time;
-            }
-            if (callData.call_summary_title) {
-                insertData.call_summary_title = callData.call_summary_title;
-            }
-            if (callData.transcript_summary) {
-                insertData.transcript_summary = callData.transcript_summary;
-            }
-            if (callData.is_external_call !== undefined) {
-                insertData.is_external_call = callData.is_external_call;
-            }
-
-            // Remove undefined values
-            Object.keys(insertData).forEach(key => {
-                if (insertData[key] === undefined) {
-                    delete insertData[key];
-                }
-            });
-
-            // Try to insert with all fields first
-            let { data, error } = await this.client
-                .from('calls')
-                .insert([insertData])
-                .select()
-                .single();
-
-            if (error && error.message.includes('column') && error.message.includes('does not exist')) {
-                console.log('⚠️ Some columns missing, trying with basic fields only');
-                
-                // Fallback: insert with only basic fields
-                const basicInsertData = {
-                    phone_number: insertData.phone_number,
-                    phone_number_id: insertData.phone_number_id,
-                    status: insertData.status,
-                    created_at: insertData.created_at
-                };
-
-                // Add fields that might exist
-                if (insertData.elevenlabs_conversation_id) {
-                    basicInsertData.elevenlabs_conversation_id = insertData.elevenlabs_conversation_id;
-                }
-
-                const { data: basicData, error: basicError } = await this.client
-                    .from('calls')
-                    .insert([basicInsertData])
-                    .select()
-                    .single();
-
-                if (basicError) throw basicError;
-                data = basicData;
-            } else if (error) {
-                throw error;
-            }
-            
-            console.log(`✅ Call created with ID: ${data.id}, phone_number_id: ${phoneNumberId}`);
-            return data;
+            return await this.callsRepo.createCall(callData);
         } catch (error) {
             console.error('Error creating call:', error.message);
             throw new Error(`Failed to create call: ${error.message}`);
@@ -191,21 +65,7 @@ class SupabaseDBService {
      */
     async updateCallStatus(callId, status) {
         try {
-            const updateData = { status };
-            
-            if (status === 'completed' || status === 'failed') {
-                updateData.end_time = new Date().toISOString();
-            }
-
-            const { data, error } = await this.client
-                .from('calls')
-                .update(updateData)
-                .eq('id', callId)
-                .select()
-                .single();
-
-            if (error) throw error;
-            
+            const data = await this.callsRepo.updateCallStatus(callId, status);
             console.log(`✅ Call ${callId} status updated to: ${status}`);
             return data;
         } catch (error) {
@@ -221,13 +81,7 @@ class SupabaseDBService {
      */
     async insertTranscriptions(transcriptionData) {
         try {
-            const { data, error } = await this.client
-                .from('transcriptions')
-                .insert(transcriptionData)
-                .select();
-
-            if (error) throw error;
-            
+            const data = await this.transcriptionsRepo.insertTranscriptions(transcriptionData);
             console.log(`✅ Inserted ${data.length} transcription records`);
             return data;
         } catch (error) {
@@ -243,16 +97,9 @@ class SupabaseDBService {
      */
     async deleteTranscriptionsForCall(callId) {
         try {
-            const { data, error } = await this.client
-                .from('transcriptions')
-                .delete()
-                .eq('call_id', callId)
-                .select();
-
-            if (error) throw error;
-            
-            console.log(`🗑️ Deleted ${data.length} transcription records for call ${callId}`);
-            return data.length;
+            const deleted = await this.transcriptionsRepo.deleteByCallId(callId);
+            console.log(`🗑️ Deleted ${deleted} transcription records for call ${callId}`);
+            return deleted;
         } catch (error) {
             console.error('Error deleting transcriptions:', error.message);
             throw new Error(`Failed to delete transcriptions: ${error.message}`);
@@ -284,13 +131,7 @@ class SupabaseDBService {
      */
     async insertEvents(eventData) {
         try {
-            const { data, error } = await this.client
-                .from('events')
-                .insert(eventData)
-                .select();
-
-            if (error) throw error;
-            
+            const data = await this.eventsRepo.insertEvents(eventData);
             console.log(`✅ Inserted ${data.length} event records`);
             return data;
         } catch (error) {
@@ -306,14 +147,7 @@ class SupabaseDBService {
      */
     async insertBookingAnalysis(bookingData) {
         try {
-            const { data, error } = await this.client
-                .from('booking_analysis')
-                .insert([bookingData])
-                .select()
-                .single();
-
-            if (error) throw error;
-            
+            const data = await this.bookingAnalysisRepo.insertBookingAnalysis(bookingData);
             console.log(`✅ Booking analysis inserted for call: ${bookingData.call_id}`);
             return data;
         } catch (error) {
@@ -329,21 +163,7 @@ class SupabaseDBService {
      */
     async getBookingAnalysisByCallId(callId) {
         try {
-            const { data, error } = await this.client
-                .from('booking_analysis')
-                .select('*')
-                .eq('call_id', callId)
-                .single();
-
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    // No rows returned
-                    return null;
-                }
-                throw error;
-            }
-            
-            return data;
+            return await this.bookingAnalysisRepo.getBookingAnalysisByCallId(callId);
         } catch (error) {
             console.error('Error getting booking analysis by call ID:', error.message);
             return null;
@@ -357,37 +177,7 @@ class SupabaseDBService {
      */
     async getCalls(filters = {}) {
         try {
-            let query = this.client
-                .from('calls')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            // Apply filters
-            if (filters.phone) {
-                query = query.ilike('phone_number', `%${filters.phone}%`);
-            }
-
-            if (filters.status) {
-                query = query.eq('status', filters.status);
-            }
-
-            if (filters.date) {
-                // Convert date to ISO string for comparison
-                const dateObj = new Date(filters.date);
-                const startOfDay = dateObj.toISOString();
-                const endOfDay = new Date(dateObj.getTime() + 24 * 60 * 60 * 1000).toISOString();
-                query = query.gte('created_at', startOfDay).lt('created_at', endOfDay);
-            }
-
-            if (filters.limit) {
-                query = query.limit(filters.limit);
-            }
-
-            const { data, error } = await query;
-
-            if (error) throw error;
-            
-            return data || [];
+            return await this.callsRepo.getCalls(filters);
         } catch (error) {
             console.error('Error getting calls:', error.message);
             throw new Error(`Failed to get calls: ${error.message}`);
@@ -615,34 +405,9 @@ class SupabaseDBService {
      */
     async getCallByConversationId(conversationId) {
         try {
-            console.log(`🔍 Looking for conversation ID: ${conversationId}`);
-            
-            // First try with the new column name
-            let { data, error } = await this.client
-                .from('calls')
-                .select('*')
-                .eq('elevenlabs_conversation_id', conversationId)
-                .single();
-
-            if (error && error.code === 'PGRST116') {
-                console.log(`❌ Conversation ${conversationId} not found in database`);
-                return null; // Not found
-            }
-            if (error && error.message.includes('column calls.elevenlabs_conversation_id does not exist')) {
-                // Fallback: try to find by phone number and other fields
-                console.log('⚠️ elevenlabs_conversation_id column not found, using fallback search');
-                return null; // For now, return null to create new record
-            }
-            if (error) {
-                console.error(`❌ Database error for conversation ${conversationId}:`, error.message);
-                throw error;
-            }
-
-            console.log(`✅ Found existing call for conversation ${conversationId}: ${data.id}`);
-            return data;
+            return await this.callsRepo.getCallByConversationId(conversationId);
         } catch (error) {
             console.error(`❌ Error getting call by conversation ID ${conversationId}:`, error.message);
-            // Don't throw error, just return null to create new record
             return null;
         }
     }
@@ -655,17 +420,7 @@ class SupabaseDBService {
      */
     async updateCall(callId, updateData) {
         try {
-            const { data, error } = await this.client
-                .from('calls')
-                .update(updateData)
-                .eq('id', callId)
-                .select()
-                .single();
-
-            if (error) throw error;
-            
-            console.log(`✅ Call ${callId} updated successfully`);
-            return data;
+            return await this.callsRepo.updateCall(callId, updateData);
         } catch (error) {
             console.error('Error updating call:', error.message);
             throw new Error(`Failed to update call: ${error.message}`);
@@ -680,24 +435,7 @@ class SupabaseDBService {
      */
     async getCallsByPhoneNumber(phoneNumber, options = {}) {
         try {
-            let query = this.client
-                .from('calls')
-                .select('*')
-                .eq('phone_number', phoneNumber)
-                .order('created_at', { ascending: false });
-
-            if (options.limit) {
-                query = query.limit(options.limit);
-            }
-
-            if (options.status) {
-                query = query.eq('status', options.status);
-            }
-
-            const { data, error } = await query;
-
-            if (error) throw error;
-
+            const data = await this.callsRepo.getCallsByPhoneNumber(phoneNumber, options);
             console.log(`✅ Retrieved ${data.length} calls for phone number ${phoneNumber}`);
             return data;
         } catch (error) {
@@ -797,44 +535,7 @@ class SupabaseDBService {
      */
     async getCallStatistics() {
         try {
-            // Get basic call statistics
-            const { data: calls, error: callsError } = await this.client
-                .from('calls')
-                .select('status, call_result, duration_seconds, is_external_call');
-
-            if (callsError) throw callsError;
-
-            const stats = {
-                total_calls: calls.length,
-                internal_calls: 0,
-                external_calls: 0,
-                successful_calls: 0,
-                failed_calls: 0,
-                average_duration: 0,
-                total_duration: 0
-            };
-
-            calls.forEach(call => {
-                if (call.is_external_call) {
-                    stats.external_calls++;
-                } else {
-                    stats.internal_calls++;
-                }
-
-                if (call.call_result === 'answered') {
-                    stats.successful_calls++;
-                } else {
-                    stats.failed_calls++;
-                }
-
-                if (call.duration_seconds) {
-                    stats.total_duration += call.duration_seconds;
-                }
-            });
-
-            stats.average_duration = stats.total_calls > 0 ? stats.total_duration / stats.total_calls : 0;
-
-            return stats;
+            return await this.callsRepo.getCallStatistics();
         } catch (error) {
             console.error('Error getting call statistics:', error.message);
             throw new Error(`Failed to get call statistics: ${error.message}`);
@@ -874,21 +575,7 @@ class SupabaseDBService {
      */
     async getCallById(callId) {
         try {
-            const { data, error } = await this.client
-                .from('calls')
-                .select('*')
-                .eq('id', callId)
-                .single();
-
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    // No rows returned
-                    return null;
-                }
-                throw error;
-            }
-
-            return data;
+            return await this.callsRepo.getCallById(callId);
         } catch (error) {
             console.error('Error getting call by ID:', error.message);
             throw new Error(`Failed to get call by ID: ${error.message}`);
@@ -902,24 +589,7 @@ class SupabaseDBService {
      */
     async deleteCallsByCriteria(criteria) {
         try {
-            let query = this.client
-                .from('calls')
-                .delete();
-
-            // Apply criteria
-            if (criteria.elevenlabs_conversation_id === null) {
-                query = query.is('elevenlabs_conversation_id', null);
-            }
-            if (criteria.phone_number) {
-                query = query.eq('phone_number', criteria.phone_number);
-            }
-
-            const { data, error } = await query;
-
-            if (error) throw error;
-
-            console.log(`✅ Deleted ${data?.length || 0} calls matching criteria`);
-            return data?.length || 0;
+            return await this.callsRepo.deleteCallsByCriteria(criteria);
         } catch (error) {
             console.error('Error deleting calls by criteria:', error.message);
             throw new Error(`Failed to delete calls by criteria: ${error.message}`);
@@ -1142,15 +812,7 @@ class SupabaseDBService {
      */
     async updateContact(contactId, updateData) {
         try {
-            const { data, error } = await this.client
-                .from('contacts')
-                .update(updateData)
-                .eq('id', contactId)
-                .select()
-                .single();
-
-            if (error) throw error;
-            
+            const data = await this.contactsRepo.updateContact(contactId, updateData);
             console.log(`✅ Contact updated: ${contactId}`);
             return data;
         } catch (error) {
@@ -1166,15 +828,9 @@ class SupabaseDBService {
      */
     async deleteContact(contactId) {
         try {
-            const { error } = await this.client
-                .from('contacts')
-                .delete()
-                .eq('id', contactId);
-
-            if (error) throw error;
-            
+            const ok = await this.contactsRepo.deleteContact(contactId);
             console.log(`✅ Contact deleted: ${contactId}`);
-            return true;
+            return ok;
         } catch (error) {
             console.error('Error deleting contact:', error.message);
             throw new Error(`Failed to delete contact: ${error.message}`);
@@ -1213,47 +869,7 @@ class SupabaseDBService {
      */
     async getPhoneNumbers(filters = {}) {
         try {
-            // Get phone numbers from the phone_numbers table only
-            let query = this.client
-                .from('phone_numbers')
-                .select(`
-                    *,
-                    contacts (
-                        id,
-                        first_name,
-                        last_name,
-                        email,
-                        company_name,
-                        position
-                    )
-                `)
-                .order('created_at', { ascending: false });
-
-            if (filters.phoneNumber) {
-                query = query.ilike('phone_number', `%${filters.phoneNumber}%`);
-            }
-
-            if (filters.contactId) {
-                query = query.eq('contact_id', filters.contactId);
-            }
-
-            if (filters.phoneType) {
-                query = query.eq('phone_type', filters.phoneType);
-            }
-
-            if (filters.doNotCall !== undefined) {
-                query = query.eq('do_not_call', filters.doNotCall);
-            }
-
-            if (filters.limit) {
-                query = query.limit(filters.limit);
-            }
-
-            const { data, error } = await query;
-
-            if (error) throw error;
-            
-            return data || [];
+            return await this.phoneNumbersRepo.getPhoneNumbers(filters);
         } catch (error) {
             console.error('Error getting phone numbers:', error.message);
             throw new Error(`Failed to get phone numbers: ${error.message}`);
@@ -1370,25 +986,7 @@ class SupabaseDBService {
      */
     async getPhoneNumberById(phoneId) {
         try {
-            const { data, error } = await this.client
-                .from('phone_numbers')
-                .select(`
-                    *,
-                    contacts (
-                        id,
-                        first_name,
-                        last_name,
-                        email,
-                        company_name,
-                        position
-                    )
-                `)
-                .eq('id', phoneId)
-                .single();
-
-            if (error) throw error;
-            
-            return data;
+            return await this.phoneNumbersRepo.getPhoneNumberById(phoneId);
         } catch (error) {
             console.error('Error getting phone number:', error.message);
             throw new Error(`Failed to get phone number: ${error.message}`);
@@ -1403,15 +1001,7 @@ class SupabaseDBService {
      */
     async updatePhoneNumber(phoneId, updateData) {
         try {
-            const { data, error } = await this.client
-                .from('phone_numbers')
-                .update(updateData)
-                .eq('id', phoneId)
-                .select()
-                .single();
-
-            if (error) throw error;
-            
+            const data = await this.phoneNumbersRepo.updatePhoneNumber(phoneId, updateData);
             console.log(`✅ Phone number updated: ${phoneId}`);
             return data;
         } catch (error) {
@@ -1427,15 +1017,9 @@ class SupabaseDBService {
      */
     async deletePhoneNumber(phoneId) {
         try {
-            const { error } = await this.client
-                .from('phone_numbers')
-                .delete()
-                .eq('id', phoneId);
-
-            if (error) throw error;
-            
+            const ok = await this.phoneNumbersRepo.deletePhoneNumber(phoneId);
             console.log(`✅ Phone number deleted: ${phoneId}`);
-            return true;
+            return ok;
         } catch (error) {
             console.error('Error deleting phone number:', error.message);
             throw new Error(`Failed to delete phone number: ${error.message}`);
@@ -1652,141 +1236,14 @@ class SupabaseDBService {
      */
     async getReadySequenceEntries(limit = 10) {
         try {
-            const now = new Date().toISOString();
-            
-            const { data, error } = await this.client
-                .from('sequence_entries')
-                .select(`
-                    *,
-                    sequences (
-                        id,
-                        name,
-                        max_attempts,
-                        retry_delay_hours,
-                        timezone,
-                        business_hours_start,
-                        business_hours_end,
-                        exclude_weekends
-                    ),
-                    phone_numbers (
-                        id,
-                        phone_number,
-                        do_not_call,
-                        contacts (
-                            id,
-                            first_name,
-                            last_name,
-                            company_name
-                        )
-                    )
-                `)
-                .eq('status', 'active')
-                .lte('next_call_time', now)
-                .order('next_call_time', { ascending: true })
-                .limit(limit);
-
-            if (error) throw error;
-            
-            return data || [];
+            return await this.sequenceEntriesRepo.getReadySequenceEntries(limit);
         } catch (error) {
             console.error('Error getting ready sequence entries:', error.message);
             throw new Error(`Failed to get ready sequence entries: ${error.message}`);
         }
     }
 
-    /**
-     * Update sequence entry after a call attempt
-     * @param {string} entryId - Sequence entry ID
-     * @param {Object} callResult - Result of the call attempt
-     * @returns {Promise<Object>} Updated sequence entry
-     */
-    async updateSequenceEntryAfterCall(entryId, callResult) {
-        try {
-            // Get current entry with business hours
-            const { data: entry, error: entryError } = await this.client
-                .from('sequence_entries')
-                .select(`
-                    *,
-                    sequences (
-                        id,
-                        name,
-                        max_attempts,
-                        retry_delay_hours,
-                        timezone,
-                        business_hours_start,
-                        business_hours_end,
-                        exclude_weekends
-                    )
-                `)
-                .eq('id', entryId)
-                .single();
-
-            if (entryError) throw entryError;
-
-            const sequence = entry.sequences;
-            const currentAttempt = entry.current_attempt + 1;
-            const maxAttempts = sequence.max_attempts;
-            const retryDelayHours = sequence.retry_delay_hours;
-
-            let newStatus = 'active';
-            let nextCallTime = null;
-
-            // Determine next status and call time based on call result
-            if (callResult.successful) {
-                // Call was successful, mark as completed
-                newStatus = 'completed';
-            } else if (currentAttempt >= maxAttempts) {
-                // Max attempts reached
-                newStatus = 'max_attempts_reached';
-            } else {
-                // Schedule next call with business hours consideration
-                const businessHours = {
-                    timezone: sequence.timezone || 'UTC',
-                    business_hours_start: sequence.business_hours_start || '09:00:00',
-                    business_hours_end: sequence.business_hours_end || '17:00:00',
-                    exclude_weekends: sequence.exclude_weekends !== false // Default to true
-                };
-                
-                // Use business hours service if available, otherwise fallback to simple calculation
-                try {
-                    const BusinessHoursService = require('./business-hours');
-                    const businessHoursService = new BusinessHoursService();
-                    await businessHoursService.initialize();
-                    
-                    const now = new Date();
-                    const nextCall = businessHoursService.addHoursRespectingBusinessHours(now, retryDelayHours, businessHours);
-                    nextCallTime = nextCall.toISOString();
-                } catch (error) {
-                    console.error('Error using business hours service, falling back to simple calculation:', error.message);
-                    // Fallback to simple calculation
-                    const nextCall = new Date();
-                    nextCall.setHours(nextCall.getHours() + retryDelayHours);
-                    nextCallTime = nextCall.toISOString();
-                }
-            }
-
-            // Update the sequence entry
-            const { data, error } = await this.client
-                .from('sequence_entries')
-                .update({
-                    current_attempt: currentAttempt,
-                    next_call_time: nextCallTime,
-                    status: newStatus,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', entryId)
-                .select()
-                .single();
-
-            if (error) throw error;
-            
-            console.log(`✅ Sequence entry updated: ${entryId}, status: ${newStatus}, attempt: ${currentAttempt}`);
-            return data;
-        } catch (error) {
-            console.error('Error updating sequence entry:', error.message);
-            throw new Error(`Failed to update sequence entry: ${error.message}`);
-        }
-    }
+    // updateSequenceEntryAfterCall migrated to SequenceService (services/sequences/SequenceService.js)
 
     /**
      * Update a sequence entry with custom data
@@ -1796,15 +1253,7 @@ class SupabaseDBService {
      */
     async updateSequenceEntry(entryId, updateData) {
         try {
-            const { data, error } = await this.client
-                .from('sequence_entries')
-                .update(updateData)
-                .eq('id', entryId)
-                .select()
-                .single();
-
-            if (error) throw error;
-            
+            const data = await this.sequenceEntriesRepo.updateSequenceEntry(entryId, updateData);
             console.log(`✅ Sequence entry updated: ${entryId}`);
             return data;
         } catch (error) {
@@ -1820,33 +1269,7 @@ class SupabaseDBService {
      */
     async findActiveSequenceEntriesForPhoneNumber(phoneNumber) {
         try {
-            const { data, error } = await this.client
-                .from('sequence_entries')
-                .select(`
-                    *,
-                    sequences (
-                        id,
-                        name,
-                        max_attempts,
-                        retry_delay_hours
-                    ),
-                    phone_numbers (
-                        id,
-                        phone_number,
-                        do_not_call,
-                        contacts (
-                            id,
-                            first_name,
-                            last_name,
-                            company_name
-                        )
-                    )
-                `)
-                .eq('phone_numbers.phone_number', phoneNumber)
-                .eq('status', 'active');
-
-            if (error) throw error;
-            
+            const data = await this.sequenceEntriesRepo.findActiveSequenceEntriesForPhoneNumber(phoneNumber);
             console.log(`✅ Found ${data.length} active sequence entries for ${phoneNumber}`);
             return data || [];
         } catch (error) {
@@ -1862,58 +1285,7 @@ class SupabaseDBService {
      */
     async getSequenceEntries(filters = {}) {
         try {
-            let query = this.client
-                .from('sequence_entries')
-                .select(`
-                    *,
-                    sequences (
-                        id,
-                        name,
-                        description,
-                        max_attempts,
-                        retry_delay_hours,
-                        is_active
-                    ),
-                    phone_numbers (
-                        id,
-                        phone_number,
-                        do_not_call,
-                        contacts (
-                            id,
-                            first_name,
-                            last_name,
-                            company_name
-                        )
-                    )
-                `)
-                .order('created_at', { ascending: false });
-
-            if (filters.sequenceId) {
-                query = query.eq('sequence_id', filters.sequenceId);
-            }
-
-            if (filters.status) {
-                query = query.eq('status', filters.status);
-            }
-
-            if (filters.phoneNumberId) {
-                query = query.eq('phone_number_id', filters.phoneNumberId);
-            }
-
-            if (filters.limit) {
-                query = query.limit(filters.limit);
-            }
-
-            if (filters.page && filters.limit) {
-                const offset = (filters.page - 1) * filters.limit;
-                query = query.range(offset, offset + filters.limit - 1);
-            }
-
-            const { data, error } = await query;
-
-            if (error) throw error;
-            
-            return data || [];
+            return await this.sequenceEntriesRepo.getSequenceEntries(filters);
         } catch (error) {
             console.error('Error getting sequence entries:', error.message);
             throw new Error(`Failed to get sequence entries: ${error.message}`);
@@ -1927,15 +1299,7 @@ class SupabaseDBService {
      */
     async getSequenceById(sequenceId) {
         try {
-            const { data, error } = await this.client
-                .from('sequences')
-                .select('*')
-                .eq('id', sequenceId)
-                .single();
-
-            if (error) throw error;
-            
-            return data;
+            return await this.sequencesRepo.getSequenceById(sequenceId);
         } catch (error) {
             console.error('Error getting sequence by ID:', error.message);
             throw new Error(`Failed to get sequence: ${error.message}`);
@@ -1950,15 +1314,7 @@ class SupabaseDBService {
      */
     async updateSequence(sequenceId, updateData) {
         try {
-            const { data, error } = await this.client
-                .from('sequences')
-                .update(updateData)
-                .eq('id', sequenceId)
-                .select()
-                .single();
-
-            if (error) throw error;
-            
+            const data = await this.sequencesRepo.updateSequence(sequenceId, updateData);
             console.log(`✅ Sequence updated: ${sequenceId}`);
             return data;
         } catch (error) {
@@ -1974,15 +1330,9 @@ class SupabaseDBService {
      */
     async deleteSequence(sequenceId) {
         try {
-            const { error } = await this.client
-                .from('sequences')
-                .delete()
-                .eq('id', sequenceId);
-
-            if (error) throw error;
-            
+            const ok = await this.sequencesRepo.deleteSequence(sequenceId);
             console.log(`✅ Sequence deleted: ${sequenceId}`);
-            return true;
+            return ok;
         } catch (error) {
             console.error('Error deleting sequence:', error.message);
             throw new Error(`Failed to delete sequence: ${error.message}`);
@@ -2125,9 +1475,8 @@ class SupabaseDBService {
                 return null; // Not found
             }
             if (error && error.message.includes('column calls.elevenlabs_conversation_id does not exist')) {
-                // Fallback: try to find by phone number and other fields
-                console.log('⚠️ elevenlabs_conversation_id column not found, using fallback search');
-                return null; // For now, return null to create new record
+                console.log('⚠️ elevenlabs_conversation_id column not found');
+                return null;
             }
             if (error) {
                 console.error(`❌ Database error for conversation ${conversationId}:`, error.message);
