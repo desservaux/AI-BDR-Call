@@ -62,7 +62,6 @@ http://localhost:3000
 
 - **`index.js`**: Main server with ElevenLabs integration
 - **`services/elevenlabs.js`**: ElevenLabs API service
-- **`services/call-logger.js`**: Call logging and analytics
 - **`services/supabase-db.js`**: Database operations
 - **`public/index.html`**: Web interface for call management
 
@@ -88,7 +87,7 @@ The system uses your configured ElevenLabs agent with:
 - **`POST /make-call`**: Initiate outbound calls
 - **`GET /test-elevenlabs`**: Test ElevenLabs connection
 - **`GET /elevenlabs/agents`**: List available agents
-- **`GET /elevenlabs/phone-numbers`**: List configured phone numbers
+<!-- Removed: GET /elevenlabs/phone-numbers (unused) -->
 - **`GET /health`**: Server health check
 
 ## 📊 Features

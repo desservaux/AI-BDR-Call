@@ -2596,10 +2596,10 @@
                             <div class="call-detail-value">${call.phone_number || 'N/A'}</div>
                         </div>
                         <div class="call-detail-item">
-                            <div class="call-detail-label">Status</div>
+                            <div class="call-detail-label">Result</div>
                             <div class="call-detail-value">
-                                <span class="call-status-badge status-${call.enhanced_status || call.status || 'unknown'}">
-                                    ${call.enhanced_status || call.status || 'Unknown'}
+                                <span class="call-status-badge status-${call.call_result || 'unknown'}">
+                                    ${call.call_result || 'Unknown'}
                                 </span>
                             </div>
                         </div>
@@ -2620,8 +2620,8 @@
                             <div class="call-detail-value">${new Date(call.created_at).toLocaleString()}</div>
                         </div>
                         <div class="call-detail-item">
-                            <div class="call-detail-label">Call Successful</div>
-                            <div class="call-detail-value">${call.call_successful ? '✅ Yes' : '❌ No'}</div>
+                            <div class="call-detail-label">Answered</div>
+                            <div class="call-detail-value">${call.call_result === 'answered' ? '✅ Yes' : '❌ No'}</div>
                         </div>
                         <div class="call-detail-item">
                             <div class="call-detail-label">External Call</div>
@@ -3251,8 +3251,8 @@
             }
             
             const callsHtml = calls.length > 0 ? calls.map(call => {
-                const statusClass = getStatusClass(call.status);
-                const statusText = getStatusText(call.status);
+                const statusClass = getStatusClass(call.call_result);
+                const statusText = getStatusText(call.call_result);
                 const date = new Date(call.created_at).toLocaleString();
                 const duration = call.duration_seconds ? 
                     `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s` : 'N/A';
@@ -3347,8 +3347,8 @@
             }
             
             const callsHtml = calls.length > 0 ? calls.map(call => {
-                const statusClass = getStatusClass(call.status);
-                const statusText = getStatusText(call.status);
+                const statusClass = getStatusClass(call.call_result);
+                const statusText = getStatusText(call.call_result);
                 const date = new Date(call.created_at).toLocaleString();
                 const duration = call.duration_seconds ? 
                     `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s` : 'N/A';
@@ -3388,9 +3388,8 @@
         }
 
         // Helper functions for status
-        function getStatusClass(status) {
-            switch(status) {
-                case 'completed': return 'status-completed';
+        function getStatusClass(result) {
+            switch(result) {
                 case 'answered': return 'status-answered';
                 case 'failed': return 'status-failed';
                 case 'unanswered': return 'status-unanswered';
@@ -3398,9 +3397,8 @@
             }
         }
 
-        function getStatusText(status) {
-            switch(status) {
-                case 'completed': return 'Completed';
+        function getStatusText(result) {
+            switch(result) {
                 case 'answered': return 'Answered';
                 case 'failed': return 'Failed';
                 case 'unanswered': return 'Unanswered';

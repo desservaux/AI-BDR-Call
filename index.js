@@ -11,7 +11,6 @@ dotenv.config();
 
 // Import services
 const elevenLabsService = require('./services/elevenlabs'); // ElevenLabs integration
-const callLogger = require('./services/call-logger'); // Call logging service
 const callSync = require('./services/call-sync'); // Call sync service (already instantiated)
 const SupabaseDBService = require('./services/supabase-db'); // Database service
 
@@ -94,7 +93,7 @@ app.post('/make-call', async (req, res) => {
 
         // Get ElevenLabs configuration from environment
         const agentId = process.env.ELEVENLABS_AGENT_ID || 'agent_01jzr5hv9eefkbmnyz8y6smw19';
-        const agentPhoneNumberId = process.env.ELEVENLABS_PHONE_NUMBER_ID || '+447846855904';
+        const agentPhoneNumberId = process.env.ELEVENLABS_PHONE_NUMBER_ID || 'phnum_0101k1tg02tkf5paw24vvbtwrmr2';
 
         // Make call via ElevenLabs API
         const result = await elevenLabsService.makeOutboundCall(
@@ -139,21 +138,7 @@ app.get('/elevenlabs/agents', async (req, res) => {
     }
 });
 
-// ElevenLabs phone numbers endpoint
-app.get('/elevenlabs/phone-numbers', async (req, res) => {
-    try {
-        const phoneNumbers = await elevenLabsService.getAgentPhoneNumbers();
-        res.json({
-            success: true,
-            phoneNumbers: phoneNumbers
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
+// (Removed) ElevenLabs phone numbers endpoint - unused
 
 // ElevenLabs conversation details endpoint
 app.get('/elevenlabs/conversation/:conversationId', async (req, res) => {
@@ -243,30 +228,9 @@ app.get('/api/calls', async (req, res) => {
         
         const calls = result.calls || [];
         const total = result.total || 0;
-        
-        // Get analysis data for all calls
-        const callsWithAnalysis = await Promise.all(calls.map(async (call) => {
-            try {
-                const analysis = await supabaseDb.getBookingAnalysisByCallId(call.id);
-                return {
-                    ...call,
-                    enhanced_status: mapCallStatus(call),
-                    meeting_booked: analysis ? analysis.meeting_booked : false,
-                    person_interested: analysis ? analysis.person_interested : false,
-                    person_very_upset: analysis ? analysis.person_very_upset : false,
-                    confidence_score: analysis ? analysis.confidence_score : 0
-                };
-            } catch (error) {
-                console.warn(`⚠️ Error fetching analysis for call ${call.id}:`, error.message);
-                return {
-                    ...call,
-                    enhanced_status: mapCallStatus(call),
-                    meeting_booked: false,
-                    person_interested: false,
-                    person_very_upset: false,
-                    confidence_score: 0
-                };
-            }
+        const callsWithAnalysis = calls.map(call => ({
+            ...call,
+            enhanced_status: mapCallStatus(call)
         }));
         
         res.json({
@@ -500,7 +464,7 @@ function processCallDataForCharts(calls) {
         const hour = new Date(call.created_at).getHours();
         const duration = call.duration_seconds || 0;
         const isSuccessful = call.call_result === 'answered'; // Use call_result for success
-        const status = call.status || 'unknown';
+        const status = call.call_result || 'unknown';
         
         // Daily calls
         dailyCalls[date] = (dailyCalls[date] || 0) + 1;
@@ -1094,7 +1058,7 @@ app.get('/api/sequences/:sequenceId/statistics', async (req, res) => {
         
         console.log(`📊 Fetching statistics for sequence: ${sequenceId}`);
         
-        const stats = await supabaseDb.getSequenceStatistics(sequenceId);
+        const stats = await supabaseDb.getSequenceStatisticsForSequence(sequenceId);
         
         res.json({
             success: true,
@@ -1115,7 +1079,7 @@ app.get('/api/sequences/statistics', async (req, res) => {
     try {
         console.log(`📊 Fetching all sequence statistics`);
         
-        const stats = await supabaseDb.getSequenceStatistics();
+        const stats = await supabaseDb.getSequenceStatisticsForSequence();
         
         res.json({
             success: true,
@@ -1560,38 +1524,84 @@ app.post('/api/contacts/upload-to-sequence', upload.single('csvFile'), async (re
     }
 });
 
-// Sequence call completion handler
-async function handleSequenceCallCompletion(conversationId, callStatus) {
+// Sequence call completion handler (drop-in replacement)
+async function handleSequenceCallCompletion(conversationId, webhookStatus) {
     try {
-        console.log(`🔄 Processing sequence call completion: ${conversationId} (${callStatus})`);
-        
-        // Find the call record
-        const call = await supabaseDb.getCallByConversationId(conversationId);
+        console.log(`🔄 Processing sequence call completion: ${conversationId} (webhookStatus: ${webhookStatus})`);
+
+        // 1) Fetch enhanced details from ElevenLabs (authoritative source)
+        let details;
+        try {
+            details = await elevenLabsService.getConversationDetailsEnhanced(conversationId);
+        } catch (e) {
+            console.warn(`⚠️ Failed to fetch conversation details for ${conversationId}: ${e.message}`);
+            details = null;
+        }
+
+        // 2) Normalize status and duration
+        // Prefer API details. Fallback to webhook status (map 'completed' -> 'done')
+        const status_raw = (details && details.status_raw)
+            || (webhookStatus === 'completed' ? 'done' : webhookStatus)
+            || 'processing';
+
+        const durationSecs = (details && typeof details.duration === 'number')
+            ? details.duration
+            : 0;
+
+        // 3) Compute your canonical call_result
+        const call_result = elevenLabsService.computeOutcomeFrom(status_raw, durationSecs);
+
+        // If call is not final (initiated/in-progress/processing), do nothing now
+        if (call_result === null) {
+            console.log(`⏭️ Call ${conversationId} is not final yet (status=${status_raw}); deferring.`);
+            return;
+        }
+
+        // 4) Find or create the call DB row
+        let call = await supabaseDb.getCallByConversationId(conversationId);
         if (!call) {
-            console.log(`⚠️ No call found for conversation: ${conversationId}`);
-            return;
+            // If you have details, use the phone number and metadata; otherwise, minimal
+            const phoneNumber = details && (details.to_number || details.phone_number) ? (details.to_number || details.phone_number) : 'unknown';
+            const callData = {
+                elevenlabs_conversation_id: conversationId,
+                phone_number: phoneNumber,
+                agent_id: details && details.agent_id,
+                agent_name: details && details.agent_name,
+                created_at: new Date().toISOString()
+            };
+            call = await supabaseDb.createCall(callData);
+            console.log(`✅ Created minimal call record ${call.id} for ${conversationId}`);
         }
-        
-        // Find sequence entry for this phone number
-        const sequenceEntry = await supabaseDb.getSequenceEntryByPhoneNumber(call.phone_number);
-        if (!sequenceEntry) {
-            console.log(`⚠️ No sequence entry found for phone: ${call.phone_number}`);
-            return;
-        }
-        
-        // Determine call result
-        const callResult = {
-            successful: callStatus === 'completed' && call.duration_seconds > 0,
-            status: callStatus,
-            duration: call.duration_seconds || 0,
-            conversation_id: conversationId
+
+        // 5) Update call with the canonical result and metadata (no ElevenLabs analysis)
+        const updateData = {
+            phone_number: details && (details.to_number || details.phone_number) ? (details.to_number || details.phone_number) : call.phone_number || 'unknown',
+            start_time: details && details.start_time ? details.start_time : call.start_time || null,
+            duration_seconds: durationSecs,
+            message_count: details && details.message_count ? details.message_count : call.message_count || 0,
+            transcript_summary: details && details.transcript_summary ? details.transcript_summary : call.transcript_summary || null,
+            call_summary_title: details && details.call_summary_title ? details.call_summary_title : call.call_summary_title || null,
+            call_result: call_result,
+            updated_at: new Date().toISOString()
         };
-        
-        // Update sequence entry
-        await supabaseDb.updateSequenceEntryAfterCall(sequenceEntry.id, callResult);
-        
-        console.log(`✅ Sequence entry updated for call: ${conversationId}`);
-        
+        await supabaseDb.updateCall(call.id, updateData);
+
+        // 6) Update sequence entry with your success definition
+        const sequenceEntry = await supabaseDb.getSequenceEntryByPhoneNumber(updateData.phone_number);
+        if (!sequenceEntry) {
+            console.log(`⚠️ No active sequence entry for ${updateData.phone_number}`);
+            return;
+        }
+
+        const successful = (call_result === 'answered');
+        await supabaseDb.updateSequenceEntryAfterCall(sequenceEntry.id, {
+            successful,
+            status: status_raw,
+            duration: durationSecs,
+            conversation_id: conversationId
+        });
+
+        console.log(`✅ Sequence entry updated for ${conversationId}: successful=${successful}, result=${call_result}`);
     } catch (error) {
         console.error('❌ Error handling sequence call completion:', error.message);
     }

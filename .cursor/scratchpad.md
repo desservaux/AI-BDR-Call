@@ -20,8 +20,8 @@
 - ✅ Sequence preparation infrastructure
 - ✅ Comprehensive sequence revamp with decoupled architecture
 
-**NEXT OBJECTIVE**: 🎯 Phase 24 - Business Hours Feature for Sequences
-Add business hours functionality to sequences, allowing users to define timezone, time range, and exclude weekends (Saturdays and Sundays) from call scheduling.
+**NEXT OBJECTIVE**: 🎯 Phase 25 - Stabilization & Bugfix Sprint
+Focus on critical stability fixes, scheduling accuracy, and API consistency to ensure reliable production behavior.
 
 ## Key Challenges and Analysis
 
@@ -127,39 +127,17 @@ Add business hours functionality to sequences, allowing users to define timezone
 5. **UI for Sequence Visibility**: ✅ Display number of contacts at each step/status within sequences
 6. **"Do Not Call" Flag**: ✅ Implemented do_not_call boolean flag on contacts and phone_numbers tables
 
-### 🎯 CURRENT CHALLENGE: Business Hours Feature for Sequences
+### 🎯 CURRENT CHALLENGE: Phase 25 - Stabilization & Bugfix Sprint
 
-**Objective**: Add business hours functionality to sequences, allowing users to define timezone, time range, and exclude weekends (Saturdays and Sundays) from call scheduling.
+**Objective**: Resolve high-impact defects affecting server startup, scheduling reliability, dialing, API performance, and data consistency.
 
-**Key Requirements**:
-1. **Database Schema Updates**: 
-   - Add business_hours fields to sequences table
-   - Add timezone, start_time, end_time, exclude_weekends fields
-   - Support for multiple time ranges per sequence
-
-2. **Backend Logic Updates**:
-   - Update sequence manager to respect business hours
-   - Implement timezone-aware scheduling logic
-   - Add weekend exclusion logic
-   - Update next call time calculation to respect business hours
-
-3. **Frontend UI Updates**:
-   - Add business hours configuration to sequence creation/editing
-   - Timezone selector with common timezones
-   - Time range pickers for start and end times
-   - Weekend exclusion checkbox
-   - Business hours display in sequence details
-
-4. **Validation and Error Handling**:
-   - Validate time ranges (start < end)
-   - Handle timezone conversions properly
-   - Provide clear error messages for invalid configurations
-
-**Critical Issues to Address**:
-- **Timezone Handling**: Proper timezone conversion and daylight saving time support
-- **Business Hours Logic**: Complex scheduling that respects time ranges and weekends
-- **UI/UX**: Intuitive interface for configuring business hours
-- **Performance**: Efficient business hours checking in sequence processing
+**Scope (Condensed)**:
+- Syntax error in `services/call-sync.js` prevents server start
+- Business-hours service: incorrect imports, undefined functions, and fractional-hour handling
+- Sequence dialing: wrong ElevenLabs `makeOutboundCall` signature usage
+- SupabaseDBService: duplicate `getSequenceStatistics` method name causing overrides
+- Batch add-to-sequence: payload mismatch between API and DB layer
+- /api/calls: N+1 queries and redundant analysis fetches despite using a view
 
 ## High-level Task Breakdown
 
@@ -179,58 +157,171 @@ Add business hours functionality to sequences, allowing users to define timezone
 **Phase 22**: ✅ Critical call sync issues fix - phone number extraction, analysis timing
 **Phase 23**: ✅ Comprehensive sequence revamp with decoupled architecture
 
-### 🎯 Phase 24: Business Hours Feature for Sequences
+### 🎯 Phase 25: Stabilization & Bugfix Sprint
 
-- [ ] **Task 24.1**: Database Schema Updates (HIGH PRIORITY)
-  - **Priority**: HIGH - Database foundation
-  - **Requirements**:
-    - Add business_hours fields to sequences table: timezone, start_time, end_time, exclude_weekends
-    - Support for multiple time ranges per sequence (JSONB field)
-    - Add indexes for business hours queries
-  - **Success Criteria**: Database schema supports business hours configuration
-  - **Implementation**: Update supabase-schema.sql and create migration script
+- [ ] **Task 25.1**: Fix Syntax Error in `services/call-sync.js`
+  - Remove stray character after `initialize()`
+  - Success: Node can require module and server starts
 
-- [ ] **Task 24.2**: Backend Business Hours Logic (HIGH PRIORITY)
-  - **Priority**: HIGH - Core business hours functionality
-  - **Requirements**:
-    - Update sequence manager to respect business hours
-    - Implement timezone-aware scheduling logic
-    - Add weekend exclusion logic
-    - Update next call time calculation to respect business hours
-    - Add business hours validation functions
-  - **Success Criteria**: Sequence processing respects business hours configuration
-  - **Implementation**: Update sequence-manager.js and supabase-db.js
+- [ ] **Task 25.2**: Correct Business-Hours Service
+  - Import and use `utcToZonedTime`/`zonedTimeToUtc` consistently
+  - Fix fractional-hour additions using seconds; ensure weekend skips
+  - Success: Deterministic scheduling across timezones; no ReferenceErrors
 
-- [ ] **Task 24.3**: API Endpoints Updates (MEDIUM PRIORITY)
-  - **Priority**: MEDIUM - API support for business hours
-  - **Requirements**:
-    - Update sequence CRUD endpoints to handle business hours
-    - Add business hours validation in API layer
-    - Update sequence management endpoints
-  - **Success Criteria**: API supports business hours configuration
-  - **Implementation**: Update index.js sequence endpoints
+- [ ] **Task 25.3**: Fix ElevenLabs Dialing Signature
+  - Use `ELEVENLABS_AGENT_ID` and `ELEVENLABS_PHONE_NUMBER_ID` envs
+  - Success: Sequence dialing initiates calls with correct parameters
 
-- [ ] **Task 24.4**: Frontend Business Hours UI (HIGH PRIORITY)
-  - **Priority**: HIGH - User interface for business hours
-  - **Requirements**:
-    - Add business hours configuration to sequence creation/editing modals
-    - Timezone selector with common timezones
-    - Time range pickers for start and end times
-    - Weekend exclusion checkbox
-    - Business hours display in sequence details
-    - Validation and error handling in UI
-  - **Success Criteria**: Users can configure business hours through intuitive UI
-  - **Implementation**: Update index.html with business hours UI components
+- [ ] **Task 25.4**: Resolve SupabaseDBService Method Collision
+  - Rename to `getSequenceStatisticsByPhoneNumber(phoneNumber)` and `getSequenceStatisticsForSequence(sequenceId = null)`
+  - Update all call sites
+  - Success: Next-call calculation uses per-phone stats correctly
 
-- [ ] **Task 24.5**: Testing and Validation (MEDIUM PRIORITY)
-  - **Priority**: MEDIUM - Quality assurance
-  - **Requirements**:
-    - Test business hours logic with different timezones
-    - Test weekend exclusion functionality
-    - Test time range validation
-    - Test sequence processing with business hours
-  - **Success Criteria**: Business hours feature works correctly in all scenarios
-  - **Implementation**: Manual testing and validation
+- [ ] **Task 25.5**: Align Batch Add-to-Sequence Payload
+  - Accept `{ phoneNumberIds }` array in DB layer; update helpers
+  - Success: Adding numbers to a sequence works end-to-end
+
+- [ ] **Task 25.6**: Optimize `/api/calls`
+  - Use fields from `calls_with_analysis` view directly
+  - Apply analysis filters in SQL; remove per-row enrichment
+  - Success: Reduced latency and DB load; correct pagination
+
+- [ ] **Task 25.7**: Tests & Validation
+  - Smoke tests for dialing, scheduling, and API filters
+  - Success: All fixes verified with sample data in multiple timezones
+
+### Current Status / Progress Tracking
+
+- 2025-08-11: Executor removed duplicate `getCallByConversationId` definition from `services/supabase-db.js`. Verified no duplicate for sequence stats: code now intentionally has `getSequenceStatisticsByPhoneNumber(phoneNumber)` and `getSequenceStatisticsForSequence(sequenceId = null)` serving different scopes.
+
+- 2025-08-11: Executor replaced `handleSequenceCallCompletion` in `index.js` to derive success from ElevenLabs canonical status and duration using `computeOutcomeFrom`. Now:
+  - Fetches `getConversationDetailsEnhanced` for authoritative `status_raw`, `duration`, and phone number
+  - Maps webhook `completed` to `done`; ignores non-final statuses (initiated/in-progress/processing)
+  - Computes `call_result` and updates/creates call accordingly (no reliance on legacy `completed`)
+  - Updates sequence entry with `successful = (call_result === 'answered')` and preserves raw status/duration
+  
+- 2025-08-11: Executor fixed Gemini analysis flow in `services/call-sync.js#processDetailedConversation`:
+  - Switched to `geminiService.analyzeTranscript` (correct method)
+  - Constructed plaintext transcript by joining speaker/text lines
+  - Gated on `this.geminiService.initialized` to avoid futile calls
+  - Passed only `result.analysis` object to `storeAnalysisResults`
+  - Improved skip log to include service initialization state
+
+### Executor's Feedback or Assistance Requests
+
+- None. Webhook function is a drop-in replacement; no API surface changes required. Recommend:
+  - Trigger `/webhook/elevenlabs-call-ended` with a real `conversation_id` to verify sequence update.
+  - Ensure `GEMINI_API_KEY` and model are set so analysis path can run; otherwise it will skip with clear logs.
+
+### Lessons
+
+- Treat ElevenLabs finality strictly via `status_raw` and duration; never rely on `completed` from webhook. Compute success centrally with `computeOutcomeFrom`.
+
+#### Phase 25 Detailed Plan (Actions, Files, Tests)
+
+- Task 25.1: Fix Syntax Error in `services/call-sync.js`
+  - Actions:
+    - Open `services/call-sync.js`; remove stray character after `initialize()` method.
+    - Run server start to verify module loads.
+  - Files:
+    - `services/call-sync.js`
+  - Tests:
+    - `node index.js` boots without syntax errors.
+  - Success Criteria:
+    - Server starts; no syntax/runtime error from call-sync on require.
+
+- Task 25.2: Correct Business-Hours Service
+  - Actions:
+    - Replace imports with `const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');` in `services/business-hours.js`.
+    - Standardize all timezone conversions to use `utcToZonedTime`/`zonedTimeToUtc`.
+    - Rewrite `addHoursRespectingBusinessHours` to add seconds (handle fractional hours precisely).
+    - Ensure `isWithinBusinessHours` and `calculateNextBusinessHoursTime` consistently use the same primitives; normalize to next valid window if outside.
+    - Implement weekend skipping with `[0,6].includes(day)` checks where needed.
+  - Files:
+    - `services/business-hours.js`
+    - Optional: `tmp_bh_test.js`, `tmp_check_tz.js` for quick checks
+  - Tests (include DST boundary and weekend):
+    - Outside hours → moves to next start within same day.
+    - Near end-of-day with multi-hour add → rolls to next BH day start.
+    - Friday after hours with exclude_weekends → lands on Monday start.
+    - Fractional add (e.g., 1.5 hours) preserves minutes/seconds.
+    - Cross-timezone sanity (e.g., `America/New_York`, `Europe/London`, `UTC`).
+  - Success Criteria:
+    - No ReferenceErrors; outputs are timezone-correct and deterministic.
+
+- Task 25.3: Fix ElevenLabs Dialing Signature
+  - Actions:
+    - In `services/sequence-manager.js`, update `processReadySequenceEntries` to call:
+      `makeOutboundCall(agentId, agentPhoneNumberId, toNumber, options)` using env `ELEVENLABS_AGENT_ID` and `ELEVENLABS_PHONE_NUMBER_ID`.
+    - Add guard: if envs missing, log error and skip dialing with clear reason.
+  - Files:
+    - `services/sequence-manager.js`
+    - `.env` or deployment config (ensure values present)
+  - Tests:
+    - Dry-run with mock/stub to verify parameters passed correctly.
+    - Happy path: call initiation path reached when envs present.
+    - Failure path: descriptive log and no crash when envs missing.
+  - Success Criteria:
+    - Sequence dialing path calls ElevenLabs with correct signature.
+
+- Task 25.4: Resolve SupabaseDBService Method Collision
+  - Actions:
+    - In `services/supabase-db.js`, rename:
+      - `getSequenceStatistics` (per-phone) → `getSequenceStatisticsByPhoneNumber(phoneNumber)`
+      - `getSequenceStatistics(sequenceId = null)` (sequence-level) → `getSequenceStatisticsForSequence(sequenceId = null)`
+    - Update all call sites (e.g., `services/sequence-manager.js`) to use the per-phone method for next-call calculation.
+  - Files:
+    - `services/supabase-db.js`
+    - `services/sequence-manager.js` (and any others referencing old name)
+  - Tests:
+    - Verify per-phone stats return expected structure used by next-call logic.
+    - Run a sequence step where next-call time depends on stats; confirm no exceptions and correct scheduling.
+  - Success Criteria:
+    - No method overrides; next-call computation uses correct stats.
+
+- Task 25.5: Align Batch Add-to-Sequence Payload
+  - Actions:
+    - Update DB service method to accept `phoneNumberIds: number[]`.
+    - Implement iteration and call `addPhoneNumberToSequence(sequenceId, id)` per id; ensure idempotent insert/upsert.
+    - Update `index.js` POST `/api/sequences/:id/entries` to pass `{ phoneNumberIds }` through to DB service.
+    - Ensure frontend request body sends `{ phoneNumberIds }` (update JS in `public/index.html` if needed).
+  - Files:
+    - `services/supabase-db.js`
+    - `index.js`
+    - `public/index.html` (JS that triggers batch add)
+  - Tests:
+    - API call with `[1,2,3]` succeeds; DB shows 3 entries.
+    - Duplicate ids do not create duplicates (idempotency confirmed).
+    - Error handling: invalid ids → partial failure handling/logging.
+  - Success Criteria:
+    - Batch add works end-to-end with `{ phoneNumberIds }` payload.
+
+- Task 25.6: Optimize `/api/calls`
+  - Actions:
+    - In `services/supabase-db.js#getCallsWithAdvancedFilters`, apply filters directly in SQL using `calls_with_analysis` columns (`meeting_booked`, `person_interested`, `person_very_upset`).
+    - Remove per-row `getBookingAnalysisByCallId` enrichment in `index.js` `/api/calls` handler.
+    - Ensure pagination and ordering happen in SQL only; do not re-filter in JS.
+  - Files:
+    - `services/supabase-db.js`
+    - `index.js`
+  - Tests:
+    - Pagination stable with filters applied.
+    - Response rows already contain analysis booleans; no extra DB hits per row.
+    - Compare latency before/after (expect reduction) on pages of 50–100 rows.
+  - Success Criteria:
+    - No N+1 behavior; filters applied in SQL; correct ordering and pagination.
+
+- Task 25.7: Tests & Validation
+  - Actions:
+    - Create/extend quick scripts: `tmp_bh_test.js`, `tmp_seq_update_test.js`, `test-db.js` for non-interactive validation.
+    - Manual smoke tests for dialing path with envs set and unset.
+    - Verify `/api/calls` with combinations of analysis filters and pagination.
+  - Acceptance Checklist:
+    - Server boot without syntax errors.
+    - Business-hours math correct across timezones and weekends.
+    - Sequence dialing initiates correctly.
+    - Batch add creates correct entries without duplicates.
+    - `/api/calls` has no redundant per-row queries.
 
 ## Project Status Board
 
@@ -248,52 +339,24 @@ Add business hours functionality to sequences, allowing users to define timezone
 - ✅ Critical call sync issues fixed - phone number extraction, analysis timing
 - ✅ **NEW**: Comprehensive sequence revamp with decoupled architecture and full UI
 
-### 🎯 Phase 24: Business Hours Feature for Sequences
+### 🎯 Phase 25: Stabilization & Bugfix Sprint
 
-**Objective**: Add business hours functionality to sequences, allowing users to define timezone, time range, and exclude weekends (Saturdays and Sundays) from call scheduling.
+**Objective**: Address critical defects impacting stability, scheduling accuracy, and performance. Keep prior phase details condensed for clarity.
 
 **Current Tasks**:
-- [ ] **Task 24.1**: Database Schema Updates (HIGH PRIORITY)
-  - Add business_hours fields to sequences table: timezone, start_time, end_time, exclude_weekends
-  - Support for multiple time ranges per sequence (JSONB field)
-  - Add indexes for business hours queries
-  - Success Criteria: Database schema supports business hours configuration
-
-- [ ] **Task 24.2**: Backend Business Hours Logic (HIGH PRIORITY)
-  - Update sequence manager to respect business hours
-  - Implement timezone-aware scheduling logic
-  - Add weekend exclusion logic
-  - Update next call time calculation to respect business hours
-  - Add business hours validation functions
-  - Success Criteria: Sequence processing respects business hours configuration
-
-- [ ] **Task 24.3**: API Endpoints Updates (MEDIUM PRIORITY)
-  - Update sequence CRUD endpoints to handle business hours
-  - Add business hours validation in API layer
-  - Update sequence management endpoints
-  - Success Criteria: API supports business hours configuration
-
-- [ ] **Task 24.4**: Frontend Business Hours UI (HIGH PRIORITY)
-  - Add business hours configuration to sequence creation/editing modals
-  - Timezone selector with common timezones
-  - Time range pickers for start and end times
-  - Weekend exclusion checkbox
-  - Business hours display in sequence details
-  - Validation and error handling in UI
-  - Success Criteria: Users can configure business hours through intuitive UI
-
-- [ ] **Task 24.5**: Testing and Validation (MEDIUM PRIORITY)
-  - Test business hours logic with different timezones
-  - Test weekend exclusion functionality
-  - Test time range validation
-  - Test sequence processing with business hours
-  - Success Criteria: Business hours feature works correctly in all scenarios
+- [ ] Task 25.1: Fix syntax error in `services/call-sync.js`
+- [ ] Task 25.2: Business-hours service corrections
+- [ ] Task 25.3: ElevenLabs dialing signature fix
+- [ ] Task 25.4: SupabaseDBService method rename + call sites (in progress)
+- [ ] Task 25.5: Batch add-to-sequence payload alignment
+- [ ] Task 25.6: `/api/calls` N+1 removal and SQL filters
+- [ ] Task 25.7: Tests & validation
 
 **CRITICAL REQUIREMENTS**:
-- **Timezone Support**: Proper timezone conversion and daylight saving time support
-- **Business Hours Logic**: Complex scheduling that respects time ranges and weekends
-- **UI/UX**: Intuitive interface for configuring business hours
-- **Performance**: Efficient business hours checking in sequence processing
+- **Stability**: Server must start reliably; no runtime ReferenceErrors
+- **Scheduling Correctness**: Timezone-aware, DST-safe, precise fractional-hour handling
+- **Dialing Reliability**: Correct parameters to ElevenLabs
+- **Performance**: Remove N+1 patterns; filter at the DB layer
 
 ## Executor's Feedback or Assistance Requests
 
@@ -502,3 +565,8 @@ Add business hours functionality to sequences, allowing users to define timezone
 
 Database schema: 
 check supabase-schema.sql to get the current supabase schema. Update it when you do any modification to the database schema
+
+Cleanup (ElevenLabs phone numbers endpoint):
+- Removed unused `GET /elevenlabs/phone-numbers` route in `index.js`
+- Removed `getAgentPhoneNumbers()` from `services/elevenlabs.js`
+- Updated `README.md` to note removal

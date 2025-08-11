@@ -3,8 +3,8 @@ const XLSX = require('xlsx');
 
 class SupabaseDBService {
     constructor() {
-        this.supabaseUrl = process.env.SUPABASE_URL || 'https://elvnlecliyhdlflzmzeh.supabase.co';
-        this.supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsdm5sZWNsaXloZGxmbHptemVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3MjEyODgsImV4cCI6MjA2OTI5NzI4OH0.SOds2z36iJuHv4tSusH1vlSqUNLM6oT9oFpBy2bL624';
+        this.supabaseUrl = process.env.SUPABASE_URL ;
+        this.supabaseKey = process.env.SUPABASE_ANON_KEY ;
         
         this.client = createClient(this.supabaseUrl, this.supabaseKey);
     }
@@ -711,7 +711,7 @@ class SupabaseDBService {
      * @param {string} phoneNumber - Phone number to analyze
      * @returns {Promise<Object>} Sequence statistics
      */
-    async getSequenceStatistics(phoneNumber) {
+    async getSequenceStatisticsByPhoneNumber(phoneNumber) {
         try {
             const calls = await this.getCallsByPhoneNumber(phoneNumber);
             
@@ -729,9 +729,9 @@ class SupabaseDBService {
 
             if (calls.length > 0) {
                 calls.forEach(call => {
-                    if (call.status === 'completed') {
+                    if (call.call_result === 'answered') {
                         stats.successful_calls++;
-                    } else if (call.status === 'failed') {
+                    } else {
                         stats.failed_calls++;
                     }
 
@@ -969,14 +969,14 @@ class SupabaseDBService {
 
             const { data: recentCalls, error: recentError } = await this.client
                 .from('calls')
-                .select('created_at, status')
+                .select('created_at, call_result')
                 .gte('created_at', sevenDaysAgo.toISOString());
 
             if (recentError) throw recentError;
 
             const recentStats = {
                 calls_last_7_days: recentCalls.length,
-                new_calls: recentCalls.filter(call => call.status === 'completed').length
+                new_calls: recentCalls.filter(call => call.call_result === 'answered').length
             };
 
             return {
@@ -1994,7 +1994,7 @@ class SupabaseDBService {
      * @param {string} sequenceId - Optional sequence ID to filter by
      * @returns {Promise<Object>} Sequence statistics
      */
-    async getSequenceStatistics(sequenceId = null) {
+    async getSequenceStatisticsForSequence(sequenceId = null) {
         try {
             let query = this.client
                 .from('sequence_entries')
@@ -2105,43 +2105,7 @@ class SupabaseDBService {
         }
     }
 
-    /**
-     * Get call by conversation ID
-     * @param {string} conversationId - ElevenLabs conversation ID
-     * @returns {Promise<Object|null>} Call record or null if not found
-     */
-    async getCallByConversationId(conversationId) {
-        try {
-            console.log(`🔍 Looking for conversation ID: ${conversationId}`);
-            
-            const { data, error } = await this.client
-                .from('calls')
-                .select('*')
-                .eq('elevenlabs_conversation_id', conversationId)
-                .single();
-
-            if (error && error.code === 'PGRST116') {
-                console.log(`❌ Conversation ${conversationId} not found in database`);
-                return null; // Not found
-            }
-            if (error && error.message.includes('column calls.elevenlabs_conversation_id does not exist')) {
-                // Fallback: try to find by phone number and other fields
-                console.log('⚠️ elevenlabs_conversation_id column not found, using fallback search');
-                return null; // For now, return null to create new record
-            }
-            if (error) {
-                console.error(`❌ Database error for conversation ${conversationId}:`, error.message);
-                throw error;
-            }
-
-            console.log(`✅ Found existing call for conversation ${conversationId}: ${data.id}`);
-            return data;
-        } catch (error) {
-            console.error(`❌ Error getting call by conversation ID ${conversationId}:`, error.message);
-            // Don't throw error, just return null to create new record
-            return null;
-        }
-    }
+    
 
     /**
      * Get sequence entry by phone number
@@ -2298,7 +2262,8 @@ class SupabaseDBService {
             
             // Then add all phone numbers to the sequence
             const phoneNumbers = await this.getPhoneNumbers();
-            const sequenceResult = await this.addPhoneNumbersToSequence(sequenceId, phoneNumbers.data);
+            const phoneNumberIds = (phoneNumbers || []).map(p => p.id);
+            const sequenceResult = await this.addPhoneNumbersToSequence(sequenceId, phoneNumberIds);
             
             uploadResult.sequence_additions = sequenceResult.added;
             uploadResult.sequence_errors = sequenceResult.errors;
@@ -2324,7 +2289,8 @@ class SupabaseDBService {
             
             // Then add all phone numbers to the sequence
             const phoneNumbers = await this.getPhoneNumbers();
-            const sequenceResult = await this.addPhoneNumbersToSequence(sequenceId, phoneNumbers.data);
+            const phoneNumberIds = (phoneNumbers || []).map(p => p.id);
+            const sequenceResult = await this.addPhoneNumbersToSequence(sequenceId, phoneNumberIds);
             
             uploadResult.sequence_additions = sequenceResult.added;
             uploadResult.sequence_errors = sequenceResult.errors;
@@ -2520,21 +2486,17 @@ class SupabaseDBService {
      * @param {Array} phoneNumbers - Array of phone number objects
      * @returns {Promise<Object>} Result with added count and errors
      */
-    async addPhoneNumbersToSequence(sequenceId, phoneNumbers) {
-        const result = {
-            added: 0,
-            errors: []
-        };
-
-        for (const phone of phoneNumbers) {
+    async addPhoneNumbersToSequence(sequenceId, phoneNumberIds) {
+        const result = { added: 0, errors: [] };
+        const ids = Array.isArray(phoneNumberIds) ? phoneNumberIds : [];
+        for (const id of ids) {
             try {
-                await this.addPhoneNumberToSequence(sequenceId, phone.id);
+                await this.addPhoneNumberToSequence(sequenceId, id);
                 result.added++;
             } catch (error) {
-                result.errors.push(`Phone ${phone.phone_number}: ${error.message}`);
+                result.errors.push(`PhoneNumberId ${id}: ${error.message}`);
             }
         }
-
         return result;
     }
 }

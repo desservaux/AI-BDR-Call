@@ -1,4 +1,4 @@
-const { toZonedTime, fromZonedTime, format } = require('date-fns-tz');
+const { utcToZonedTime, zonedTimeToUtc } = require('date-fns-tz');
 
 /**
  * Business Hours Utility Service
@@ -78,7 +78,7 @@ class BusinessHoursService {
         
         try {
             // Convert UTC date to sequence timezone
-            const zonedDate = toZonedTime(date, timezone);
+            const zonedDate = utcToZonedTime(date, timezone);
             
             // Check if it's a weekend and weekends are excluded
             if (exclude_weekends) {
@@ -186,10 +186,10 @@ class BusinessHoursService {
             const businessHoursDuration = endTime - startTime;
             
             // Calculate total business hours to add
-            let remainingHours = hoursToAdd;
+            let remainingSeconds = Math.round(hoursToAdd * 3600);
             let currentDate = new Date(zonedDate);
             
-            while (remainingHours > 0) {
+            while (remainingSeconds > 0) {
                 // Move to next business day if needed
                 if (exclude_weekends) {
                     while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
@@ -207,14 +207,19 @@ class BusinessHoursService {
                 // Calculate how many business hours we can add today
                 const currentTimeInSeconds = currentDate.getHours() * 3600 + currentDate.getMinutes() * 60 + currentDate.getSeconds();
                 const remainingToday = endTime - currentTimeInSeconds;
-                const hoursToAddToday = Math.min(remainingHours, remainingToday / 3600);
-                
-                if (hoursToAddToday > 0) {
-                    currentDate.setHours(currentDate.getHours() + hoursToAddToday);
-                    remainingHours -= hoursToAddToday;
+                const secondsToSpend = Math.min(remainingSeconds, remainingToday);
+
+                if (secondsToSpend > 0) {
+                    currentDate = new Date(currentDate.getTime() + secondsToSpend * 1000);
+                    remainingSeconds -= secondsToSpend;
                 } else {
-                    // Move to next day
+                    // Move to next business day start
                     currentDate.setDate(currentDate.getDate() + 1);
+                    if (exclude_weekends) {
+                        while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
+                            currentDate.setDate(currentDate.getDate() + 1);
+                        }
+                    }
                     currentDate.setHours(startHours, startMinutes, startSeconds, 0);
                 }
             }

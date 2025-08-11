@@ -175,30 +175,7 @@ class ElevenLabsService {
         }
     }
 
-    /**
-     * Get agent phone numbers
-     * @returns {Promise<Array>} List of agent phone numbers
-     */
-    async getAgentPhoneNumbers() {
-        try {
-            // Based on ElevenLabs API docs, this endpoint might be different
-            // Let's try the correct endpoint for phone numbers
-            const response = await this.client.get('/convai/phone-numbers');
-            return response.data;
-        } catch (error) {
-            console.error('❌ Error getting agent phone numbers:', error.response?.data || error.message);
-            // Return mock data for now since the endpoint might be different
-            return {
-                phone_numbers: [
-                    {
-                        id: process.env.ELEVENLABS_PHONE_NUMBER_ID || '+447846855904',
-                        phone_number: process.env.ELEVENLABS_PHONE_NUMBER_ID || '+447846855904',
-                        agent_id: process.env.ELEVENLABS_AGENT_ID || 'agent_01jzr5hv9eefkbmnyz8y6smw19'
-                    }
-                ]
-            };
-        }
-    }
+    // (Removed) getAgentPhoneNumbers - unused
 
     /**
      * Test the service connection

@@ -63,7 +63,7 @@ class CallSyncService {
             console.error('❌ Failed to initialize Call Sync Service:', error.message);
             return false;
         }
-s    }
+    }
 
     /**
      * Sync all conversations from ElevenLabs to our database
@@ -303,20 +303,34 @@ s    }
             }
 
             // NOW you can check shouldAnalyzeCall with the correct data including call_result
-            if (this.shouldAnalyzeCall(consolidatedData)) {
+            if (this.shouldAnalyzeCall(consolidatedData) && this.geminiService.initialized) {
                 try {
                     console.log(`🧠 Triggering Gemini analysis for call ${callId}...`);
-                    const analysis = await this.geminiService.analyzeCall(consolidatedData.transcript);
-                    
-                    if (analysis) {
-                        await this.storeAnalysisResults(callId, analysis);
+
+                    // Build plain-text transcript string
+                    const transcriptText = (consolidatedData.transcript || [])
+                        .map(m => `${m.speaker || 'unknown'}: ${m.text || ''}`)
+                        .join('\n');
+
+                    const result = await this.geminiService.analyzeTranscript(transcriptText, {
+                        duration_seconds: consolidatedData.duration,
+                        call_summary_title: consolidatedData.call_summary_title,
+                        conversation_id: conversationId,
+                        call_id: callId
+                    });
+
+                    if (result && result.success && result.analysis) {
+                        // Pass just the analysis object
+                        await this.storeAnalysisResults(callId, result.analysis);
                         console.log(`✅ Gemini analysis completed for call ${callId}`);
+                    } else {
+                        console.log(`⚠️ Gemini analysis returned no analysis for call ${callId}`);
                     }
                 } catch (analysisError) {
                     console.warn(`⚠️ Gemini analysis failed for call ${callId}:`, analysisError.message);
                 }
             } else {
-                console.log(`⏭️ Skipping Gemini analysis for call ${callId}: ${this.getSkipReason(consolidatedData)}`);
+                console.log(`⏭️ Skipping Gemini analysis for call ${callId}: ${this.getSkipReason(consolidatedData)} or service not initialized`);
             }
 
             // PHASE 23: Duration-based cleanup trigger

@@ -89,8 +89,18 @@ class SequenceManagerService {
                     const phoneNumber = entry.phone_numbers.phone_number;
                     console.log(`📞 Initiating call to ${phoneNumber} (attempt ${entry.current_attempt + 1}/${entry.sequences.max_attempts})`);
 
-                    // Make the call via ElevenLabs (fire and forget)
-                    const callResult = await elevenLabsService.makeOutboundCall(phoneNumber);
+                    // Make the call via ElevenLabs (fire and forget) with correct signature
+                    const agentId = process.env.ELEVENLABS_AGENT_ID;
+                    const agentPhoneNumberId = process.env.ELEVENLABS_PHONE_NUMBER_ID;
+                    if (!agentId || !agentPhoneNumberId) {
+                        throw new Error('Missing ELEVENLABS_AGENT_ID or ELEVENLABS_PHONE_NUMBER_ID environment variables');
+                    }
+                    const callResult = await elevenLabsService.makeOutboundCall(
+                        agentId,
+                        agentPhoneNumberId,
+                        phoneNumber,
+                        { message: 'Hello! This is your AI assistant calling via ElevenLabs.' }
+                    );
                     
                     if (callResult.success) {
                         results.calls_initiated++;
@@ -312,7 +322,7 @@ class SequenceManagerService {
         try {
             console.log(`📊 Getting sequence statistics for ${phoneNumber}...`);
             
-            const stats = await this.dbService.getSequenceStatistics(phoneNumber);
+            const stats = await this.dbService.getSequenceStatisticsByPhoneNumber(phoneNumber);
             
             console.log(`✅ Sequence statistics retrieved for ${phoneNumber}`);
             return stats;
