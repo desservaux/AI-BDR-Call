@@ -929,20 +929,7 @@
             text-align: center;
         }
         
-        .status-active {
-            background: #28a745;
-            color: white;
-        }
         
-        .status-do-not-call {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .status-inactive {
-            background: #6c757d;
-            color: white;
-        }
         
         .contact-actions,
         .sequence-actions {
@@ -1997,10 +1984,10 @@
                         filteredCalls = allCalls;
                     }
                     
-                    if (filteredCalls.length > 0) {
-                        displayCalls(filteredCalls);
-                        updatePaginationWithBackendData(totalPages, totalCalls);
-                    } else {
+                if (filteredCalls.length > 0) {
+                    displayCalls(filteredCalls);
+                    updatePagination(totalPages, totalCalls);
+                } else {
                         callsTableContent.innerHTML = '<div class="no-data">No calls found</div>';
                         hidePagination();
                     }
@@ -2109,8 +2096,8 @@
             }
         }
         
-        // Update pagination controls with backend data
-        function updatePaginationWithBackendData(totalPages, totalCalls) {
+        // Update pagination controls with backend data (unified)
+        function updatePagination(totalPages, totalCalls) {
             const paginationControls = document.getElementById('pagination-controls');
             const pageNumbers = document.getElementById('page-numbers');
             const prevBtn = document.getElementById('prev-page-btn');
@@ -2134,43 +2121,6 @@
                 const endIndex = Math.min(currentPage * itemsPerPage, totalCalls);
                 paginationInfo.textContent = `Showing ${startIndex}-${endIndex} of ${totalCalls}`;
             }
-            
-            // Generate page numbers
-            let pageNumbersHTML = '';
-            const maxVisiblePages = 5;
-            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-            
-            if (endPage - startPage + 1 < maxVisiblePages) {
-                startPage = Math.max(1, endPage - maxVisiblePages + 1);
-            }
-            
-            for (let i = startPage; i <= endPage; i++) {
-                const isActive = i === currentPage;
-                pageNumbersHTML += `<button class="page-number ${isActive ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
-            }
-            
-            pageNumbers.innerHTML = pageNumbersHTML;
-        }
-        
-        // Update pagination controls (legacy function for search)
-        function updatePagination() {
-            const totalPages = Math.ceil(filteredCalls.length / itemsPerPage);
-            const paginationControls = document.getElementById('pagination-controls');
-            const pageNumbers = document.getElementById('page-numbers');
-            const prevBtn = document.getElementById('prev-page-btn');
-            const nextBtn = document.getElementById('next-page-btn');
-            
-            if (totalPages <= 1) {
-                hidePagination();
-                return;
-            }
-            
-            paginationControls.style.display = 'flex';
-            
-            // Update previous/next buttons
-            prevBtn.disabled = currentPage <= 1;
-            nextBtn.disabled = currentPage >= totalPages;
             
             // Generate page numbers
             let pageNumbersHTML = '';
@@ -2231,7 +2181,9 @@
                 
                 if (filteredCalls.length > 0) {
                     displayCalls(filteredCalls);
-                    updatePagination();
+                    const totalPages = Math.ceil(filteredCalls.length / itemsPerPage);
+                    const totalCount = filteredCalls.length;
+                    updatePagination(totalPages, totalCount);
                 } else {
                     callsTableContent.innerHTML = '<div class="no-data">No calls found matching your search</div>';
                     hidePagination();
@@ -2684,18 +2636,7 @@
             document.getElementById('callDetailsModal').style.display = 'none';
         }
         
-        // Set active tab based on current page
-        function setActiveTab() {
-            const currentPath = window.location.pathname;
-            const tabLinks = document.querySelectorAll('.tabbar-link');
-            
-            tabLinks.forEach(link => {
-                link.classList.remove('active');
-                if (link.getAttribute('href') === currentPath) {
-                    link.classList.add('active');
-                }
-            });
-        }
+        // Removed unused setActiveTab()
         
         // Check system status
         async function checkStatus() {
@@ -3040,7 +2981,7 @@
                         <div class="sequence-status ${statusClass}">${statusText}</div>
                         <div class="sequence-entries">
                             <span class="sequence-entries-count">0</span>
-                            <button class="btn btn-small btn-view" onclick="viewSequenceDetails('${sequence.id}')">View</button>
+                            <button class="btn btn-small btn-view" onclick="showSequenceDetailsModal('${sequence.id}')">View</button>
                         </div>
                         <div class="sequence-actions">
                             <button class="btn btn-small btn-view" onclick="showSequenceDetailsModal('${sequence.id}')">👁️ View</button>
@@ -3140,7 +3081,7 @@
                 
                 if (callsData.success) {
                     // Pass the phoneId directly to showCallsModal for sequence lookup
-                    await showCallsModalWithPhoneId(phoneNumber, callsData.calls, phoneId);
+                    await showCallsModal(phoneNumber, callsData.calls, null, phoneId);
                 } else {
                     alert('Error loading calls for this phone number');
                 }
@@ -3181,14 +3122,13 @@
             }
         }
 
-        // Show calls modal for a specific phone number
-        async function showCallsModal(phoneNumber, calls, contactId) {
+        // Show calls modal for a specific phone number (optionally with phoneNumberId)
+        async function showCallsModal(phoneNumber, calls, contactId = null, phoneNumberId = null) {
             const modal = document.getElementById('callDetailsModal');
             const content = document.getElementById('callDetailsContent');
             
-            // Get phone number ID to fetch sequence information
-            let phoneNumberId = null;
-            if (contactId) {
+            // Resolve phone number ID to fetch sequence information
+            if (!phoneNumberId && contactId) {
                 try {
                     const phoneResponse = await fetch(`${API_BASE}/api/phone-numbers?contactId=${contactId}&phoneNumber=${phoneNumber}`);
                     const phoneData = await phoneResponse.json();
@@ -3201,102 +3141,6 @@
             }
             
             // Get sequence information if we have a phone number ID
-            let sequenceInfo = '';
-            if (phoneNumberId) {
-                try {
-                    const sequenceResponse = await fetch(`${API_BASE}/api/phone-numbers/${phoneNumberId}/sequences`);
-                    const sequenceData = await sequenceResponse.json();
-                    
-                    if (sequenceData.success && sequenceData.entries.length > 0) {
-                        const entries = sequenceData.entries;
-                        sequenceInfo = `
-                            <div class="sequence-info-section">
-                                <h5>🔄 Sequence Information</h5>
-                                <div class="sequence-entries-list">
-                                    ${entries.map(entry => {
-                                        const sequenceName = entry.sequences?.name || 'Unknown Sequence';
-                                        const statusBadge = `<span class="status-badge ${entry.status}">${entry.status}</span>`;
-                                        const attempts = `${entry.current_attempt}/${entry.sequences?.max_attempts || 3}`;
-                                        const nextCall = entry.next_call_time ? new Date(entry.next_call_time).toLocaleString() : 'N/A';
-                                        
-                                        return `
-                                            <div class="sequence-entry-item">
-                                                <div class="sequence-name">${sequenceName}</div>
-                                                <div class="sequence-status">${statusBadge}</div>
-                                                <div class="sequence-attempts">Attempts: ${attempts}</div>
-                                                <div class="sequence-next-call">Next Call: ${nextCall}</div>
-                                            </div>
-                                        `;
-                                    }).join('')}
-                                </div>
-                            </div>
-                        `;
-                    } else {
-                        sequenceInfo = `
-                            <div class="sequence-info-section">
-                                <h5>🔄 Sequence Information</h5>
-                                <div class="no-sequence-info">Not in any active sequences</div>
-                            </div>
-                        `;
-                    }
-                } catch (error) {
-                    console.error('Error loading sequence information:', error);
-                    sequenceInfo = `
-                        <div class="sequence-info-section">
-                            <h5>🔄 Sequence Information</h5>
-                            <div class="no-sequence-info">Error loading sequence information</div>
-                        </div>
-                    `;
-                }
-            }
-            
-            const callsHtml = calls.length > 0 ? calls.map(call => {
-                const statusClass = getStatusClass(call.call_result);
-                const statusText = getStatusText(call.call_result);
-                const date = new Date(call.created_at).toLocaleString();
-                const duration = call.duration_seconds ? 
-                    `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s` : 'N/A';
-                
-                return `
-                    <div class="call-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;">
-                        <div class="call-phone">${phoneNumber}</div>
-                        <div class="call-date">${date}</div>
-                        <div class="call-status-badge ${statusClass}">${statusText}</div>
-                        <div class="call-duration">${duration}</div>
-                        <div class="call-actions">
-                            <button class="btn btn-small btn-view" onclick="viewCallDetails('${call.id}')">View</button>
-                        </div>
-                    </div>
-                `;
-            }).join('') : '<div class="no-data">No calls found for this phone number</div>';
-            
-            content.innerHTML = `
-                <div class="call-detail-section">
-                    <h4>📞 Calls for ${phoneNumber}</h4>
-                    ${sequenceInfo}
-                    <div class="calls-table">
-                        <div class="calls-table-header">
-                            <div class="calls-header-left">
-                                <span>Call History</span>
-                                <span class="calls-count">(${calls.length} calls)</span>
-                            </div>
-                        </div>
-                        <div class="calls-table-content">
-                            ${callsHtml}
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            modal.style.display = 'block';
-        }
-
-        // Show calls modal with direct phone number ID (for phone numbers tab)
-        async function showCallsModalWithPhoneId(phoneNumber, calls, phoneNumberId) {
-            const modal = document.getElementById('callDetailsModal');
-            const content = document.getElementById('callDetailsContent');
-            
-            // Get sequence information using the direct phone number ID
             let sequenceInfo = '';
             if (phoneNumberId) {
                 try {
@@ -3489,15 +3333,7 @@
             }
         }
 
-        function editSequence(sequenceId) {
-            console.log('Edit sequence:', sequenceId);
-            // TODO: Implement sequence editing
-        }
-
-        function deleteSequence(sequenceId) {
-            console.log('Delete sequence:', sequenceId);
-            // TODO: Implement sequence deletion
-        }
+        
 
         // Load sequence statistics
         async function loadSequenceStatistics() {
@@ -3548,70 +3384,7 @@
             }
         }
 
-        // View sequence details
-        async function viewSequenceDetails(sequenceId) {
-            try {
-                const response = await fetch(`${API_BASE}/api/sequences/${sequenceId}/statistics`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    showSequenceDetailsModal(sequenceId, data.statistics);
-                } else {
-                    alert('Error loading sequence details');
-                }
-            } catch (error) {
-                console.error('Error loading sequence details:', error);
-                alert('Error loading sequence details');
-            }
-        }
-
-        // Show sequence details modal
-        function showSequenceDetailsModal(sequenceId, stats) {
-            const modal = document.getElementById('callDetailsModal');
-            const content = document.getElementById('callDetailsContent');
-            
-            const progressPercent = stats.total_entries > 0 ? 
-                Math.round((stats.completed_entries / stats.total_entries) * 100) : 0;
-            
-            content.innerHTML = `
-                <div class="call-detail-section">
-                    <h4>📊 Sequence Details</h4>
-                    <div class="sequence-stats-grid">
-                        <div class="stat-item">
-                            <div class="stat-number">${stats.total_entries}</div>
-                            <div class="stat-label">Total Entries</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number">${stats.active_entries}</div>
-                            <div class="stat-label">Active</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number">${stats.completed_entries}</div>
-                            <div class="stat-label">Completed</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number">${stats.max_attempts_reached}</div>
-                            <div class="stat-label">Max Attempts</div>
-                        </div>
-                    </div>
-                    
-                    <div class="progress-section">
-                        <h5>Progress</h5>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${progressPercent}%"></div>
-                        </div>
-                        <div class="progress-text">${progressPercent}% Complete</div>
-                    </div>
-                    
-                    <div class="sequence-actions-section">
-                        <button class="btn btn-primary" onclick="startBatchCalling()">🚀 Start Batch Calling</button>
-                        <button class="btn btn-secondary" onclick="viewBatchQueue()">📋 View Queue</button>
-                    </div>
-                </div>
-            `;
-            
-            modal.style.display = 'block';
-        }
+        // Remove alternative sequence details rendering (use dedicated modal with loadSequenceDetails)
 
         // Start batch calling
         async function startBatchCalling() {

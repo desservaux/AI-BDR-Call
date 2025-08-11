@@ -38,54 +38,54 @@ class SupabaseDBService {
     async createCall(callData) {
         try {
             const phoneNumber = callData.phoneNumber || callData.phone_number;
-            
-            if (!phoneNumber) {
-                throw new Error('Phone number is required for call creation');
-            }
+            // Allow creating a call even if phone number is unknown or missing
 
             // Ensure phone number record exists (UPSERT)
             let phoneNumberId = null;
-            try {
-                // Try to find existing phone number
-                const { data: existingPhone, error: findError } = await this.client
-                    .from('phone_numbers')
-                    .select('id')
-                    .eq('phone_number', phoneNumber)
-                    .single();
-
-                if (findError && findError.code !== 'PGRST116') { // PGRST116 = no rows returned
-                    throw findError;
-                }
-
-                if (existingPhone) {
-                    phoneNumberId = existingPhone.id;
-                } else {
-                    // Create new phone number record using UPSERT
-                    const { data: newPhone, error: createError } = await this.client
+            // Skip creating/upserting phone_numbers when number is 'unknown' or missing
+            if (phoneNumber && phoneNumber !== 'unknown') {
+                try {
+                    // Try to find existing phone number
+                    const { data: existingPhone, error: findError } = await this.client
                         .from('phone_numbers')
-                        .upsert([{
-                            phone_number: phoneNumber,
-                            phone_type: 'mobile',
-                            is_primary: true,
-                            do_not_call: false
-                        }], {
-                            onConflict: 'phone_number',
-                            ignoreDuplicates: false
-                        })
                         .select('id')
+                        .eq('phone_number', phoneNumber)
                         .single();
 
-                    if (createError) throw createError;
-                    phoneNumberId = newPhone.id;
+                    if (findError && findError.code !== 'PGRST116') { // PGRST116 = no rows returned
+                        throw findError;
+                    }
+
+                    if (existingPhone) {
+                        phoneNumberId = existingPhone.id;
+                    } else {
+                        // Create new phone number record using UPSERT
+                        const { data: newPhone, error: createError } = await this.client
+                            .from('phone_numbers')
+                            .upsert([{
+                                phone_number: phoneNumber,
+                                phone_type: 'mobile',
+                                is_primary: true,
+                                do_not_call: false
+                            }], {
+                                onConflict: 'phone_number',
+                                ignoreDuplicates: false
+                            })
+                            .select('id')
+                            .single();
+
+                        if (createError) throw createError;
+                        phoneNumberId = newPhone.id;
+                    }
+                } catch (error) {
+                    console.error('Error ensuring phone number exists:', error.message);
+                    // Continue without phone_number_id if there's an error
                 }
-            } catch (error) {
-                console.error('Error ensuring phone number exists:', error.message);
-                // Continue without phone_number_id if there's an error
             }
 
             // Prepare call data with all possible fields
             const insertData = {
-                phone_number: phoneNumber,
+                phone_number: phoneNumber || 'unknown',
                 phone_number_id: phoneNumberId,
                 chat_id: callData.chatId, // Keep for backward compatibility
                 chat_group_id: callData.chatGroupId, // Keep for backward compatibility
@@ -1623,12 +1623,49 @@ class SupabaseDBService {
      */
     async addPhoneNumberToSequence(sequenceId, phoneNumberId) {
         try {
+            // Initialize attempt counter and next call time
+            const now = new Date();
+            let initialAttempt = 0;
+            let initialNextCallTimeIso = now.toISOString();
+
+            // Try to respect sequence business hours on day-one scheduling
+            try {
+                // Fetch sequence to get business hours config
+                const sequence = await this.getSequenceById(sequenceId);
+                if (sequence) {
+                    const businessHours = {
+                        timezone: sequence.timezone || null,
+                        business_hours_start: sequence.business_hours_start || null,
+                        business_hours_end: sequence.business_hours_end || null,
+                        exclude_weekends: sequence.exclude_weekends !== false
+                    };
+
+                    // If business hours are configured, compute first valid time
+                    if (businessHours.timezone && businessHours.business_hours_start && businessHours.business_hours_end) {
+                        const BusinessHoursService = require('./business-hours');
+                        const businessHoursService = new BusinessHoursService();
+                        await businessHoursService.initialize();
+
+                        const isWithin = businessHoursService.isWithinBusinessHours(now, businessHours);
+                        const firstBhTime = isWithin
+                            ? now
+                            : businessHoursService.calculateNextBusinessHoursTime(now, businessHours);
+                        initialNextCallTimeIso = (firstBhTime || now).toISOString();
+                    }
+                }
+            } catch (bhError) {
+                // Fall back to immediate scheduling if BH calc fails
+                console.warn('Business hours initialization failed, defaulting next_call_time to now:', bhError.message);
+            }
+
             const { data, error } = await this.client
                 .from('sequence_entries')
                 .insert([{
                     sequence_id: sequenceId,
                     phone_number_id: phoneNumberId,
-                    status: 'active'
+                    status: 'active',
+                    current_attempt: initialAttempt,
+                    next_call_time: initialNextCallTimeIso
                 }])
                 .select()
                 .single();

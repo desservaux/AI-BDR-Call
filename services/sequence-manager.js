@@ -121,7 +121,7 @@ class SequenceManagerService {
                         exclude_weekends: entry.sequences.exclude_weekends !== false // Default to true
                     };
                     
-                    const nextCallTime = this.calculateNextCallTime(entry.sequences.retry_delay_hours, businessHours);
+                    const nextCallTime = this.calculateNextCallTimeSimple(entry.sequences.retry_delay_hours, businessHours);
                     
                     await this.dbService.updateSequenceEntryAfterCall(entry.id, {
                         successful: callResult.success,
@@ -239,7 +239,7 @@ class SequenceManagerService {
      * @param {Object} businessHours - Business hours configuration (optional)
      * @returns {string} ISO string for next call time
      */
-    calculateNextCallTime(retryDelayHours = 24, businessHours = null) {
+    calculateNextCallTimeSimple(retryDelayHours = 24, businessHours = null) {
         const now = new Date();
         
         if (businessHours) {
@@ -362,7 +362,7 @@ class SequenceManagerService {
      * @param {Object} analysisData - Analysis results from Gemini
      * @returns {Promise<Object>} Next call scheduling data
      */
-    async calculateNextCallTime(callData, analysisData) {
+    async calculateNextCallTimeAdvanced(callData, analysisData) {
         if (!this.initialized) {
             throw new Error('Sequence Manager Service not initialized');
         }

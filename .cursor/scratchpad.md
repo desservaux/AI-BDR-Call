@@ -127,17 +127,6 @@ Focus on critical stability fixes, scheduling accuracy, and API consistency to e
 5. **UI for Sequence Visibility**: ✅ Display number of contacts at each step/status within sequences
 6. **"Do Not Call" Flag**: ✅ Implemented do_not_call boolean flag on contacts and phone_numbers tables
 
-### 🎯 CURRENT CHALLENGE: Phase 25 - Stabilization & Bugfix Sprint
-
-**Objective**: Resolve high-impact defects affecting server startup, scheduling reliability, dialing, API performance, and data consistency.
-
-**Scope (Condensed)**:
-- Syntax error in `services/call-sync.js` prevents server start
-- Business-hours service: incorrect imports, undefined functions, and fractional-hour handling
-- Sequence dialing: wrong ElevenLabs `makeOutboundCall` signature usage
-- SupabaseDBService: duplicate `getSequenceStatistics` method name causing overrides
-- Batch add-to-sequence: payload mismatch between API and DB layer
-- /api/calls: N+1 queries and redundant analysis fetches despite using a view
 
 ## High-level Task Breakdown
 
@@ -199,6 +188,31 @@ Focus on critical stability fixes, scheduling accuracy, and API consistency to e
   - Maps webhook `completed` to `done`; ignores non-final statuses (initiated/in-progress/processing)
   - Computes `call_result` and updates/creates call accordingly (no reliance on legacy `completed`)
   - Updates sequence entry with `successful = (call_result === 'answered')` and preserves raw status/duration
+
+- 2025-08-11: Executor fixed initialization for new sequence entries in `services/supabase-db.js#addPhoneNumberToSequence`:
+  - Set `current_attempt: 0` and `next_call_time` at insert time
+  - If sequence has business hours configured, compute first `next_call_time` using `BusinessHoursService.calculateNextBusinessHoursTime(now, bh)` when outside BH; otherwise set to `now`
+  - Impact: Newly added entries are immediately discoverable by `getReadySequenceEntries`, unblocking the dialer
+
+- 2025-08-11: Executor fixed after-hours scheduling bug in `services/business-hours.js#addHoursRespectingBusinessHours`:
+  - When local `currentTime > endTime`, advance to next day before setting to start time
+  - Preserve weekend-skip logic after rolling forward
+  - Impact: Prevents `next_call_time` being set in the past, avoiding immediate re-queue loops
+
+- 2025-08-11: Executor prevented creation of bogus `'unknown'` phone number records:
+  - In `services/supabase-db.js#createCall`, skip creating/upserting a `phone_numbers` row when phone is missing or `'unknown'`; allow `phone_number_id` to remain null
+  - In `services/call-sync.js`, avoid overwriting an existing real `phone_number` with `'unknown'`; when creating minimal rows, set phone to null instead of `'unknown'`
+  - Impact: No more `'unknown'` entries in `phone_numbers`, improving UX and stats integrity
+
+- 2025-08-11: Executor resolved `SequenceManager` method collision breaking scheduling:
+  - Renamed methods to `calculateNextCallTimeSimple(retryDelayHours, businessHours)` and `calculateNextCallTimeAdvanced(callData, analysisData)`
+  - Updated `processReadySequenceEntries` to call the simple variant
+  - Impact: Prevents Promises or wrong args being used for `next_call_time`; scheduling now correct
+
+- 2025-08-11: Executor removed duplicate frontend functions in `public/index.html`:
+  - Deleted earlier placeholder `editSequence`/`deleteSequence` definitions
+  - Kept later fully implemented async versions only
+  - Impact: Avoids confusion from last-definition-wins, simplifies maintenance
   
 - 2025-08-11: Executor fixed Gemini analysis flow in `services/call-sync.js#processDetailedConversation`:
   - Switched to `geminiService.analyzeTranscript` (correct method)
@@ -206,6 +220,18 @@ Focus on critical stability fixes, scheduling accuracy, and API consistency to e
   - Gated on `this.geminiService.initialized` to avoid futile calls
   - Passed only `result.analysis` object to `storeAnalysisResults`
   - Improved skip log to include service initialization state
+
+- 2025-08-11: Executor consolidated duplicate CSS classes in `public/index.html`:
+  - Removed later duplicate definitions of `.status-active`, `.status-inactive`, `.status-do-not-call` under the contact/sequence status section
+  - Kept earlier CRM status indicator styles as the single source of truth
+  - Impact: Avoids conflicting styles and CSS bloat; consistent status badge appearance across the app
+
+- 2025-08-11: Executor consolidated duplicate/overlapping JS in `public/index.html`:
+  - Removed alternative sequence details rendering in `callDetailsModal` and the `viewSequenceDetails` wrapper; kept dedicated `sequenceDetailsModal` flow with `loadSequenceDetails(sequenceId)`
+  - Unified pagination to single `updatePagination(totalPages, totalCount)`; updated `loadCalls` and `performSearch` to use it
+  - Merged `showCallsModal` and `showCallsModalWithPhoneId` into one function with optional `phoneNumberId`; updated callers
+  - Removed unused `setActiveTab()`
+  - Impact: Reduced duplication, clearer modal responsibilities, consistent pagination behavior
 
 ### Executor's Feedback or Assistance Requests
 

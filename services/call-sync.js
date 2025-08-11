@@ -187,7 +187,7 @@ class CallSyncService {
             }
             
             // Now we have the real phone number from details
-            const phoneNumber = details.to_number || 'unknown';
+            const phoneNumber = details.to_number || null;
             console.log(`📞 Phone number for ${conversation.conversation_id}: ${phoneNumber}`);
 
             // Check if conversation already exists in our database
@@ -267,7 +267,8 @@ class CallSyncService {
             
             // Update call with consolidated data
             const updateData = {
-                phone_number: consolidatedData.to_number || 'unknown',
+                // Do not overwrite an existing real phone number with 'unknown'
+                phone_number: consolidatedData.to_number || undefined,
                 start_time: consolidatedData.start_time,
                 duration_seconds: consolidatedData.duration,
                 message_count: consolidatedData.message_count,

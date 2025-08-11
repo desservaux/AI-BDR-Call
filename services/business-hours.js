@@ -198,9 +198,19 @@ class BusinessHoursService {
                     }
                 }
                 
-                // Set to business hours start if not already in business hours
+                // Normalize to a valid business-hours starting point
                 const currentTime = currentDate.getHours() * 3600 + currentDate.getMinutes() * 60 + currentDate.getSeconds();
-                if (currentTime < startTime || currentTime > endTime) {
+                if (currentTime < startTime) {
+                    // Before business hours: set to today's start
+                    currentDate.setHours(startHours, startMinutes, startSeconds, 0);
+                } else if (currentTime > endTime) {
+                    // After business hours: move to next business day, then set to start
+                    currentDate.setDate(currentDate.getDate() + 1);
+                    if (exclude_weekends) {
+                        while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
+                            currentDate.setDate(currentDate.getDate() + 1);
+                        }
+                    }
                     currentDate.setHours(startHours, startMinutes, startSeconds, 0);
                 }
                 
