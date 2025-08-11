@@ -6,8 +6,7 @@ console.log('SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? 'SET' : 'NOT S
 console.log('ELEVENLABS_API_KEY:', process.env.ELEVENLABS_API_KEY ? 'SET' : 'NOT SET');
 
 try {
-    const DbService = require('./services/db/DbService');
-    const supabaseDb = new DbService();
+    const supabaseDb = require('./services/supabase-db');
     const dbService = new supabaseDb();
     
     console.log('✅ Database service created');

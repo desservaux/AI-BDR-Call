@@ -1,12 +1,12 @@
 const elevenLabsService = require('./elevenlabs');
-const CallService = require('./calls/CallService');
+const SupabaseDBService = require('./supabase-db');
 const geminiAnalysisService = require('./gemini-analysis');
 const sequenceManagerService = require('./sequence-manager');
 
 class CallSyncService {
     constructor() {
         this.elevenLabsService = elevenLabsService;
-        this.dbService = new CallService();
+        this.dbService = new SupabaseDBService();
         this.geminiService = geminiAnalysisService;
         this.sequenceManager = sequenceManagerService;
         this.lastSyncTime = null;
@@ -63,7 +63,7 @@ class CallSyncService {
             console.error('❌ Failed to initialize Call Sync Service:', error.message);
             return false;
         }
-    }
+s    }
 
     /**
      * Sync all conversations from ElevenLabs to our database
@@ -297,7 +297,7 @@ class CallSyncService {
                 
                 // Insert new transcriptions
                 if (transcriptionData.length > 0) {
-                    await this.dbService.insertTranscriptions(transcriptionData);
+                    await this.dbService.createTranscriptions(transcriptionData);
                     console.log(`✅ Stored ${transcriptionData.length} transcriptions for call ${callId}`);
                 }
             }
@@ -337,7 +337,43 @@ class CallSyncService {
 
 
 
+    /**
+     * Check if a call was initiated through our app (internal) or externally
+     * @param {Object} conversation - ElevenLabs conversation data
+     * @returns {boolean} True if internal call
+     */
+    isInternalCall(conversation) {
+        // For now, we'll consider all calls as potentially external
+        // In the future, we can add logic to identify internal calls
+        // based on specific patterns or metadata
+        return false;
+    }
 
+    /**
+     * Validate if a conversation should be treated as a real call
+     * @param {Object} conversation - ElevenLabs conversation data
+     * @returns {boolean} True if valid call conversation
+     */
+    isValidCallConversation(conversation) {
+        // Must have a conversation ID
+        if (!conversation.conversation_id) {
+            return false;
+        }
+
+        // Must have a status
+        if (!conversation.status) {
+            return false;
+        }
+
+        // Only skip if phone number is explicitly "unknown", "test", or empty
+        const phoneNumber = conversation.to_number || conversation.phone_number || 
+                           (conversation.metadata && conversation.metadata.external_number);
+        if (phoneNumber === 'unknown' || phoneNumber === 'test' || phoneNumber === '') {
+            return false;
+        }
+
+        return true;
+    }
 
     /**
      * Store Gemini analysis results in the database

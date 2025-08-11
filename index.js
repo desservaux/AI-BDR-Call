@@ -11,20 +11,12 @@ dotenv.config();
 
 // Import services
 const elevenLabsService = require('./services/elevenlabs'); // ElevenLabs integration
+const callLogger = require('./services/call-logger'); // Call logging service
 const callSync = require('./services/call-sync'); // Call sync service (already instantiated)
-const DbService = require('./services/db/DbService'); // Database service
-const CallService = require('./services/calls/CallService');
-const SequenceService = require('./services/sequences/SequenceService');
+const SupabaseDBService = require('./services/supabase-db'); // Database service
 
 // Initialize services
-const supabaseDb = new DbService();
-const callService = new CallService();
-const sequenceService = new SequenceService();
-
-// Initialize sequence service
-sequenceService.initialize().catch(err => {
-  console.error('Failed to initialize SequenceService:', err.message);
-});
+const supabaseDb = new SupabaseDBService();
 
 // ElevenLabs service is already instantiated
 
@@ -187,7 +179,9 @@ app.post('/webhook/elevenlabs-call-ended', async (req, res) => {
         
         console.log(`📞 ElevenLabs call ended: ${conversation_id} (${status})`);
         
-        // Process the completed call (call-logger integration can be added here if needed)
+        // Process the completed call
+        // This would integrate with the call-logger service
+        // For now, just acknowledge the webhook
         
         // Handle sequence integration
         await handleSequenceCallCompletion(conversation_id, status);
@@ -208,7 +202,10 @@ app.post('/webhook/elevenlabs-call-ended', async (req, res) => {
 // 🎯 DASHBOARD API ENDPOINTS
 
 // Helper function to map call status based on call data
-const { mapCallStatus } = require('./services/utils/statusMap');
+function mapCallStatus(call) {
+    // Since we're computing call_result in the backend, just use it directly
+    return call.call_result || call.status || 'unknown';
+}
 
 // Get all calls for dashboard with advanced filtering and pagination
 app.get('/api/calls', async (req, res) => {
@@ -246,15 +243,36 @@ app.get('/api/calls', async (req, res) => {
         
         const calls = result.calls || [];
         const total = result.total || 0;
-        // calls come from calls_with_analysis view already enriched
-        const enriched = calls.map((call) => ({
-            ...call,
-            enhanced_status: mapCallStatus(call),
+        
+        // Get analysis data for all calls
+        const callsWithAnalysis = await Promise.all(calls.map(async (call) => {
+            try {
+                const analysis = await supabaseDb.getBookingAnalysisByCallId(call.id);
+                return {
+                    ...call,
+                    enhanced_status: mapCallStatus(call),
+                    meeting_booked: analysis ? analysis.meeting_booked : false,
+                    person_interested: analysis ? analysis.person_interested : false,
+                    person_very_upset: analysis ? analysis.person_very_upset : false,
+                    confidence_score: analysis ? analysis.confidence_score : 0
+                };
+            } catch (error) {
+                console.warn(`⚠️ Error fetching analysis for call ${call.id}:`, error.message);
+                return {
+                    ...call,
+                    enhanced_status: mapCallStatus(call),
+                    meeting_booked: false,
+                    person_interested: false,
+                    person_very_upset: false,
+                    confidence_score: 0
+                };
+            }
         }));
+        
         res.json({
             success: true,
-            calls: enriched,
-            count: enriched.length,
+            calls: callsWithAnalysis,
+            count: callsWithAnalysis.length,
             total: total,
             page: parseInt(page),
             limit: parseInt(limit),
@@ -277,7 +295,7 @@ app.get('/api/calls/:callId', async (req, res) => {
         
         console.log(`📞 Fetching call details for: ${callId}`);
         
-        const callDetails = await callService.getCallDetails(callId);
+        const callDetails = await supabaseDb.getCallDetails(callId);
         
         if (!callDetails) {
             return res.status(404).json({
@@ -315,7 +333,7 @@ app.get('/api/calls/:callId', async (req, res) => {
                     
                     // Store transcriptions in database for future use
                     try {
-                        await callService.insertTranscriptions(transcriptions);
+                        await supabaseDb.insertTranscriptions(transcriptions);
                         console.log(`✅ Stored ${transcriptions.length} transcriptions from ElevenLabs`);
                     } catch (storeError) {
                         console.warn(`⚠️ Failed to store transcriptions: ${storeError.message}`);
@@ -390,7 +408,7 @@ app.get('/api/analytics', async (req, res) => {
         console.log('📊 Fetching enhanced analytics data...');
         
         // Get basic analytics from database
-        const analytics = await callService.getCallAnalytics();
+        const analytics = await supabaseDb.getCallAnalytics();
         
         // Get enhanced analytics data for charts
         const enhancedAnalytics = await getEnhancedAnalytics();
@@ -419,10 +437,16 @@ async function getEnhancedAnalytics() {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
-        const recentCalls = await callService.getRecentCallsSince(thirtyDaysAgo.toISOString());
+        const { data: recentCalls, error } = await supabaseDb.client
+            .from('calls')
+            .select('created_at, status, duration_seconds, call_result, phone_number')
+            .gte('created_at', thirtyDaysAgo.toISOString())
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
 
         // Process data for charts
-        const chartData = processCallDataForCharts(recentCalls);
+        const chartData = processCallDataForCharts(recentCalls || []);
         
         return {
             // Time series data for charts
@@ -603,12 +627,11 @@ app.get('/api/contacts', async (req, res) => {
         
         console.log(`👥 Fetching contacts with filters: name=${name}, email=${email}, company=${company}`);
         
-        const { parseBool } = require('./services/utils/parseBool');
         const contacts = await supabaseDb.getContacts({
             name: name || null,
             email: email || null,
             company: company || null,
-            doNotCall: parseBool(doNotCall),
+            doNotCall: doNotCall === 'true' ? true : (doNotCall === 'false' ? false : undefined),
             limit: limit ? parseInt(limit) : null
         });
         
@@ -746,12 +769,11 @@ app.get('/api/phone-numbers', async (req, res) => {
         
         console.log(`📱 Fetching phone numbers with filters: phoneNumber=${phoneNumber}, contactId=${contactId}`);
         
-        const { parseBool: parseBool2 } = require('./services/utils/parseBool');
         const phoneNumbers = await supabaseDb.getPhoneNumbers({
             phoneNumber: phoneNumber || null,
             contactId: contactId || null,
             phoneType: phoneType || null,
-            doNotCall: parseBool2(doNotCall),
+            doNotCall: doNotCall === 'true' ? true : (doNotCall === 'false' ? false : undefined),
             limit: limit ? parseInt(limit) : null
         });
         
@@ -1165,7 +1187,8 @@ app.post('/api/sequences/entries/:entryId/update-after-call', async (req, res) =
         const callResult = req.body;
         
         console.log(`📞 Updating sequence entry after call: ${entryId}`);
-        const updatedEntry = await sequenceService.updateAfterCall(entryId, callResult);
+        
+        const updatedEntry = await supabaseDb.updateSequenceEntryAfterCall(entryId, callResult);
         
         res.json({
             success: true,
@@ -1565,7 +1588,7 @@ async function handleSequenceCallCompletion(conversationId, callStatus) {
         };
         
         // Update sequence entry
-        await sequenceService.updateAfterCall(sequenceEntry.id, callResult);
+        await supabaseDb.updateSequenceEntryAfterCall(sequenceEntry.id, callResult);
         
         console.log(`✅ Sequence entry updated for call: ${conversationId}`);
         

@@ -63,7 +63,7 @@ http://localhost:3000
 - **`index.js`**: Main server with ElevenLabs integration
 - **`services/elevenlabs.js`**: ElevenLabs API service
 - **`services/call-logger.js`**: Call logging and analytics
-- **`services/db/DbService.js`**: Central database facade using repos
+- **`services/supabase-db.js`**: Database operations
 - **`public/index.html`**: Web interface for call management
 
 ## 🎛️ Configuration Details
