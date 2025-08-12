@@ -1623,6 +1623,21 @@ class SupabaseDBService {
      */
     async addPhoneNumberToSequence(sequenceId, phoneNumberId) {
         try {
+            // Check if already present
+            const { data: existing, error: findErr } = await this.client
+                .from('sequence_entries')
+                .select('id, status')
+                .eq('sequence_id', sequenceId)
+                .eq('phone_number_id', phoneNumberId)
+                .single();
+
+            if (!findErr && existing) {
+                return { id: existing.id, status: 'exists', entry: existing };
+            }
+            if (findErr && findErr.code !== 'PGRST116') {
+                throw findErr;
+            }
+
             // Initialize attempt counter and next call time
             const now = new Date();
             let initialAttempt = 0;
@@ -1658,6 +1673,7 @@ class SupabaseDBService {
                 console.warn('Business hours initialization failed, defaulting next_call_time to now:', bhError.message);
             }
 
+            // Insert; DB unique constraint will prevent duplicates under race
             const { data, error } = await this.client
                 .from('sequence_entries')
                 .insert([{
@@ -1670,10 +1686,16 @@ class SupabaseDBService {
                 .select()
                 .single();
 
-            if (error) throw error;
-            
+            if (error) {
+                if (error.code === '23505') {
+                    // Unique violation => treat as already present
+                    return { status: 'exists' };
+                }
+                throw error;
+            }
+
             console.log(`✅ Phone number added to sequence: ${phoneNumberId}`);
-            return data;
+            return { status: 'added', entry: data };
         } catch (error) {
             console.error('Error adding phone number to sequence:', error.message);
             throw new Error(`Failed to add phone number to sequence: ${error.message}`);
@@ -2524,12 +2546,19 @@ class SupabaseDBService {
      * @returns {Promise<Object>} Result with added count and errors
      */
     async addPhoneNumbersToSequence(sequenceId, phoneNumberIds) {
-        const result = { added: 0, errors: [] };
-        const ids = Array.isArray(phoneNumberIds) ? phoneNumberIds : [];
+        const result = { added: 0, alreadyInSequence: 0, errors: [] };
+        const ids = Array.isArray(phoneNumberIds) ? Array.from(new Set(phoneNumberIds)) : [];
         for (const id of ids) {
             try {
-                await this.addPhoneNumberToSequence(sequenceId, id);
-                result.added++;
+                const r = await this.addPhoneNumberToSequence(sequenceId, id);
+                if (r && r.status === 'exists') {
+                    result.alreadyInSequence++;
+                } else if (r && r.status === 'added') {
+                    result.added++;
+                } else {
+                    // Fallback if function returns a raw entry
+                    result.added++;
+                }
             } catch (error) {
                 result.errors.push(`PhoneNumberId ${id}: ${error.message}`);
             }

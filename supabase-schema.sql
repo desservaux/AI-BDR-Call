@@ -310,3 +310,7 @@ FROM information_schema.columns
 WHERE table_schema = 'public' 
 AND table_name IN ('contacts', 'phone_numbers', 'calls', 'transcriptions', 'events', 'booking_analysis', 'sequences', 'sequence_entries')
 ORDER BY table_name, ordinal_position;
+
+alter table public.sequence_entries
+add constraint uq_sequence_entries_sequence_phone
+unique (sequence_id, phone_number_id);

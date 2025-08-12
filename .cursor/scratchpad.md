@@ -1,3 +1,50 @@
+Background and Motivation
+We need to prevent duplicate `sequence_entries` for the same `(sequence_id, phone_number_id)`, handle concurrency, and provide clearer API feedback for bulk adds. A DB unique constraint plus idempotent service methods will ensure correctness and better UX.
+
+Key Challenges and Analysis
+- Ensure no duplicates: enforce at DB and service layers.
+- Concurrency: race-safe via unique constraint (Postgres 23505) and pre-check.
+- Backward compatibility: bulk API should expose `alreadyInSequence` without breaking existing consumers.
+
+High-level Task Breakdown
+1) Add unique constraint on `sequence_entries(sequence_id, phone_number_id)`
+   - Success: Constraint exists in DB. Duplicate inserts fail with 23505.
+2) Update `addPhoneNumberToSequence` to be idempotent
+   - Pre-check for existing row; if found, return `{ status: 'exists' }` (or with entry)
+   - Insert with business-hours-aware defaults if not present
+   - Catch 23505 and treat as `{ status: 'exists' }`
+   - Success: No duplicates; concurrent requests safe.
+3) Update `addPhoneNumbersToSequence` to dedupe and count already-present
+   - Use `Set` to dedupe incoming IDs
+   - Tally `added`, `alreadyInSequence`, collect `errors`
+   - Success: Accurate counts returned
+4) Verify API returns `alreadyInSequence`
+   - `POST /api/sequences/:id/entries` returns the `result` object including `alreadyInSequence`
+   - Success: Response includes both counts
+5) Sanity test
+   - Add the same ID twice and ensure 1 added, 1 alreadyInSequence
+
+Project Status Board
+- [x] 1) DB unique constraint created (user confirmed already executed)
+- [x] 2) Make `addPhoneNumberToSequence` idempotent with pre-check and 23505 handling
+- [x] 3) Deduplicate/count in `addPhoneNumbersToSequence`
+- [x] 4) Ensure API response includes `alreadyInSequence` in result
+- [ ] 5) Sanity test manual verification (pending user test)
+
+Current Status / Progress Tracking
+- Implemented service changes in `services/supabase-db.js`.
+- Bulk endpoint now returns `result` with `added`, `alreadyInSequence`, `errors`.
+- No server code changes required for the bulk endpoint beyond consuming result (already done previously).
+
+Executor's Feedback or Assistance Requests
+- Do you want the single-add endpoint `POST /api/sequences/:sequenceId/phone-numbers` to explicitly report when the entry already exists (e.g., message change), or keep current behavior?
+
+Design Analysis and Recommendations
+- N/A for this backend change. If the frontend surfaces counts, suggest messaging like: "X added, Y already in sequence." and surface per-item errors when present.
+
+Lessons
+- Supabase PostgREST "no rows" error code is `PGRST116` and should be treated as not found rather than failure.
+- Postgres unique violation code `23505` is expected for race conditions; treat as an "exists" outcome, not an error.
 # ElevenLabs Voice Agent - Production Ready System
 
 ## Background and Motivation
