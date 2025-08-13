@@ -285,19 +285,29 @@ class SupabaseDBService {
      */
     async insertBookingAnalysis(bookingData) {
         try {
+            // Ensure timestamps
+            const payload = {
+                ...bookingData,
+                updated_at: new Date().toISOString(),
+                created_at: bookingData.created_at || new Date().toISOString()
+            };
+
             const { data, error } = await this.client
                 .from('booking_analysis')
-                .insert([bookingData])
+                .upsert([payload], {
+                    onConflict: 'call_id',
+                    ignoreDuplicates: false
+                })
                 .select()
                 .single();
 
             if (error) throw error;
             
-            console.log(`✅ Booking analysis inserted for call: ${bookingData.call_id}`);
+            console.log(`✅ Booking analysis upserted for call: ${payload.call_id}`);
             return data;
         } catch (error) {
-            console.error('Error inserting booking analysis:', error.message);
-            throw new Error(`Failed to insert booking analysis: ${error.message}`);
+            console.error('Error upserting booking analysis:', error.message);
+            throw new Error(`Failed to upsert booking analysis: ${error.message}`);
         }
     }
 
@@ -1461,6 +1471,7 @@ class SupabaseDBService {
                     sequences (
                         id,
                         name,
+                        is_active,
                         max_attempts,
                         retry_delay_hours,
                         timezone,
@@ -1483,12 +1494,16 @@ class SupabaseDBService {
                 `)
                 .eq('status', 'active')
                 .lte('next_call_time', now)
+                // Prefer DB-side filter to exclude paused sequences
+                .eq('sequences.is_active', true)
                 .order('next_call_time', { ascending: true })
                 .limit(limit);
 
             if (error) throw error;
             
-            return data || [];
+            // Defense in depth: post-filter in case related filter is finicky
+            const filtered = (data || []).filter(entry => entry?.sequences?.is_active !== false);
+            return filtered;
         } catch (error) {
             console.error('Error getting ready sequence entries:', error.message);
             throw new Error(`Failed to get ready sequence entries: ${error.message}`);

@@ -7,12 +7,10 @@ class GeminiAnalysisService {
         this.genAI = null;
         this.initialized = false;
         
-        // Rate limiting configuration
+        // Batch rate limiting configuration: up to 10 requests per 60 seconds
         this.rateLimit = {
-            maxRequests: 10,
-            timeWindow: 60000, // 1 minute in milliseconds
-            currentRequests: 0,
-            lastResetTime: Date.now(),
+            maxBatchSize: 10,
+            batchIntervalMs: 60000,
             queue: [],
             processing: false
         };
@@ -44,42 +42,17 @@ class GeminiAnalysisService {
         }
     }
 
-    /**
-     * Check and update rate limiting
-     * @returns {boolean} True if request can proceed
-     */
-    checkRateLimit() {
-        const now = Date.now();
-        
-        // Reset counter if time window has passed
-        if (now - this.rateLimit.lastResetTime >= this.rateLimit.timeWindow) {
-            this.rateLimit.currentRequests = 0;
-            this.rateLimit.lastResetTime = now;
-        }
-        
-        // Check if we can make a request
-        if (this.rateLimit.currentRequests < this.rateLimit.maxRequests) {
-            this.rateLimit.currentRequests++;
-            return true;
-        }
-        
-        return false;
-    }
+    // Removed checkRateLimit; batching enforces limits
 
     /**
      * Get current rate limit status
      * @returns {Object} Rate limit information
      */
     getRateLimitStatus() {
-        const now = Date.now();
-        const timeUntilReset = Math.max(0, this.rateLimit.timeWindow - (now - this.rateLimit.lastResetTime));
-        
         return {
-            currentRequests: this.rateLimit.currentRequests,
-            maxRequests: this.rateLimit.maxRequests,
-            timeWindowMs: this.rateLimit.timeWindow,
-            timeUntilResetMs: timeUntilReset,
-            timeUntilResetSeconds: Math.ceil(timeUntilReset / 1000),
+            maxBatchSize: this.rateLimit.maxBatchSize,
+            batchIntervalMs: this.rateLimit.batchIntervalMs,
+            batchIntervalSeconds: Math.ceil(this.rateLimit.batchIntervalMs / 1000),
             queueLength: this.rateLimit.queue.length,
             isProcessing: this.rateLimit.processing
         };
@@ -96,17 +69,8 @@ class GeminiAnalysisService {
         this.rateLimit.processing = true;
         
         while (this.rateLimit.queue.length > 0) {
-            // Check if we can make requests
-            if (!this.checkRateLimit()) {
-                // Wait for the next time window
-                const waitTime = this.rateLimit.timeWindow - (Date.now() - this.rateLimit.lastResetTime);
-                console.log(`⏳ Rate limit reached. Waiting ${Math.ceil(waitTime / 1000)} seconds before next batch...`);
-                await new Promise(resolve => setTimeout(resolve, waitTime));
-                continue;
-            }
-            
-            // Process up to 10 requests
-            const batchSize = Math.min(10, this.rateLimit.queue.length);
+            // Process up to maxBatchSize requests each interval
+            const batchSize = Math.min(this.rateLimit.maxBatchSize, this.rateLimit.queue.length);
             const batch = this.rateLimit.queue.splice(0, batchSize);
             
             console.log(`🚀 Processing batch of ${batchSize} Gemini requests...`);
@@ -125,8 +89,8 @@ class GeminiAnalysisService {
             
             // If there are more items in queue, wait before next batch
             if (this.rateLimit.queue.length > 0) {
-                console.log(`⏳ Waiting 60 seconds before next batch (${this.rateLimit.queue.length} remaining)...`);
-                await new Promise(resolve => setTimeout(resolve, 60000));
+                console.log(`⏳ Waiting ${Math.ceil(this.rateLimit.batchIntervalMs / 1000)} seconds before next batch (${this.rateLimit.queue.length} remaining)...`);
+                await new Promise(resolve => setTimeout(resolve, this.rateLimit.batchIntervalMs));
             }
         }
         

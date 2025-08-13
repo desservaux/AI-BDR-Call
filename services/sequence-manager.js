@@ -74,6 +74,12 @@ class SequenceManagerService {
                 try {
                     results.processed++;
                     
+                    // Skip if sequence is paused/inactive
+                    if (!entry.sequences?.is_active) {
+                        console.log(`⏸️ Skipping ${entry.phone_numbers?.phone_number || entry.id} - sequence is paused`);
+                        continue;
+                    }
+
                     // Skip if phone number is marked as do_not_call
                     if (entry.phone_numbers?.do_not_call || entry.phone_numbers?.contacts?.do_not_call) {
                         console.log(`⚠️ Skipping ${entry.phone_numbers.phone_number} - marked as do not call`);
