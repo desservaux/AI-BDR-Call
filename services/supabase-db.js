@@ -276,27 +276,7 @@ class SupabaseDBService {
         return this.deleteTranscriptionsForCall(callId);
     }
 
-    /**
-     * Insert event data
-     * @param {Array} eventData - Array of event objects
-     * @returns {Promise<Array>} Inserted event records
-     */
-    async insertEvents(eventData) {
-        try {
-            const { data, error } = await this.client
-                .from('events')
-                .insert(eventData)
-                .select();
-
-            if (error) throw error;
-            
-            console.log(`✅ Inserted ${data.length} event records`);
-            return data;
-        } catch (error) {
-            console.error('Error inserting events:', error.message);
-            throw new Error(`Failed to insert events: ${error.message}`);
-        }
-    }
+    // (Removed) insertEvents - unused
 
     /**
      * Insert booking analysis
@@ -321,33 +301,7 @@ class SupabaseDBService {
         }
     }
 
-    /**
-     * Get booking analysis by call ID
-     * @param {string} callId - Call ID
-     * @returns {Promise<Object|null>} Booking analysis data or null
-     */
-    async getBookingAnalysisByCallId(callId) {
-        try {
-            const { data, error } = await this.client
-                .from('booking_analysis')
-                .select('*')
-                .eq('call_id', callId)
-                .single();
-
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    // No rows returned
-                    return null;
-                }
-                throw error;
-            }
-            
-            return data;
-        } catch (error) {
-            console.error('Error getting booking analysis by call ID:', error.message);
-            return null;
-        }
-    }
+    // (Removed) getBookingAnalysisByCallId - unused
 
     /**
      * Get calls with optional filtering
@@ -654,57 +608,7 @@ class SupabaseDBService {
         }
     }
 
-    /**
-     * Get sequence statistics for a phone number
-     * @param {string} phoneNumber - Phone number to analyze
-     * @returns {Promise<Object>} Sequence statistics
-     */
-    async getSequenceStatisticsByPhoneNumber(phoneNumber) {
-        try {
-            const calls = await this.getCallsByPhoneNumber(phoneNumber);
-            
-            const stats = {
-                phone_number: phoneNumber,
-                total_calls: calls.length,
-                successful_calls: 0,
-                failed_calls: 0,
-                average_duration: 0,
-                total_duration: 0,
-                last_call_time: null,
-                next_call_time: null,
-                sequence_status: 'inactive'
-            };
-
-            if (calls.length > 0) {
-                calls.forEach(call => {
-                    if (call.call_result === 'answered') {
-                        stats.successful_calls++;
-                    } else {
-                        stats.failed_calls++;
-                    }
-
-                    if (call.duration_seconds) {
-                        stats.total_duration += call.duration_seconds;
-                    }
-                });
-
-                stats.average_duration = stats.total_duration / calls.length;
-                stats.last_call_time = calls[0].created_at; // Most recent call
-                
-                // Find the most recent call with next_call_time
-                const callWithNextTime = calls.find(call => call.next_call_time);
-                if (callWithNextTime) {
-                    stats.next_call_time = callWithNextTime.next_call_time;
-                    stats.sequence_status = callWithNextTime.sequence_status || 'active';
-                }
-            }
-
-            return stats;
-        } catch (error) {
-            console.error('Error getting sequence statistics:', error.message);
-            throw new Error(`Failed to get sequence statistics: ${error.message}`);
-        }
-    }
+    // (Removed) getSequenceStatisticsByPhoneNumber - unused
 
     /**
      * Update sequence tracking for a call
@@ -789,31 +693,7 @@ class SupabaseDBService {
         }
     }
 
-    /**
-     * Export call data
-     * @param {Object} filters - Export filters
-     * @returns {Promise<Array>} Export data
-     */
-    async exportCallData(filters = {}) {
-        try {
-            const calls = await this.getCalls(filters);
-            
-            return calls.map(call => ({
-                id: call.id,
-                phone_number: call.phone_number,
-                start_time: call.start_time,
-                end_time: call.end_time,
-                duration: call.duration,
-                status: call.status,
-                booking_outcome: call.booking_outcome,
-                confidence_score: call.confidence_score,
-                created_at: call.created_at
-            }));
-        } catch (error) {
-            console.error('Error exporting call data:', error.message);
-            throw new Error(`Failed to export call data: ${error.message}`);
-        }
-    }
+    // (Removed) exportCallData - unused
 
     /**
      * Get call by ID
@@ -960,25 +840,7 @@ class SupabaseDBService {
         }
     }
 
-    /**
-     * Get all calls (for bulk operations)
-     * @returns {Promise<Array>} Array of all calls
-     */
-    async getAllCalls() {
-        try {
-            const { data, error } = await this.client
-                .from('calls_with_analysis')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            
-            return data || [];
-        } catch (error) {
-            console.error('Error getting all calls:', error.message);
-            throw new Error(`Failed to get all calls: ${error.message}`);
-        }
-    }
+    // (Removed) getAllCalls - unused
 
     // ===== CONTACTS MANAGEMENT =====
 
@@ -1210,108 +1072,7 @@ class SupabaseDBService {
         }
     }
 
-    async generatePhoneNumbersFromCalls(filters = {}) {
-        try {
-            // Get unique phone numbers from calls
-            const { data: calls, error: callsError } = await this.client
-                .from('calls')
-                .select('phone_number')
-                .neq('phone_number', 'unknown')
-                .order('created_at', { ascending: false });
-
-            if (callsError) throw callsError;
-
-            // Get unique phone numbers
-            const uniquePhoneNumbers = [...new Set(calls.map(call => call.phone_number))];
-            
-            // Create phone number records for each unique number
-            const phoneNumberRecords = [];
-            for (const phoneNumber of uniquePhoneNumbers) {
-                // Check if phone number already exists
-                const { data: existingPhone, error: checkError } = await this.client
-                    .from('phone_numbers')
-                    .select('id')
-                    .eq('phone_number', phoneNumber)
-                    .single();
-
-                if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
-                    console.error(`Error checking phone number ${phoneNumber}:`, checkError);
-                    continue;
-                }
-
-                if (!existingPhone) {
-                    // Create new phone number record
-                    const phoneRecord = {
-                        phone_number: phoneNumber,
-                        phone_type: 'mobile',
-                        is_primary: true,
-                        do_not_call: false
-                    };
-
-                    const { data: createdPhone, error: createError } = await this.client
-                        .from('phone_numbers')
-                        .insert([phoneRecord])
-                        .select('*')
-                        .single();
-
-                    if (createError) {
-                        console.error(`Error creating phone number ${phoneNumber}:`, createError);
-                        continue;
-                    }
-
-                    phoneNumberRecords.push(createdPhone);
-                } else {
-                    // Get existing phone number with full details
-                    const { data: existingPhoneFull, error: getError } = await this.client
-                        .from('phone_numbers')
-                        .select(`
-                            *,
-                            contacts (
-                                id,
-                                first_name,
-                                last_name,
-                                email,
-                                company_name,
-                                position
-                            )
-                        `)
-                        .eq('id', existingPhone.id)
-                        .single();
-
-                    if (!getError) {
-                        phoneNumberRecords.push(existingPhoneFull);
-                    }
-                }
-            }
-
-            // Apply filters to the generated phone numbers
-            let filteredPhoneNumbers = phoneNumberRecords;
-
-            if (filters.phoneNumber) {
-                filteredPhoneNumbers = filteredPhoneNumbers.filter(pn => 
-                    pn.phone_number.toLowerCase().includes(filters.phoneNumber.toLowerCase())
-                );
-            }
-
-            if (filters.phoneType) {
-                filteredPhoneNumbers = filteredPhoneNumbers.filter(pn => 
-                    pn.phone_type === filters.phoneType
-                );
-            }
-
-            if (filters.doNotCall !== undefined) {
-                filteredPhoneNumbers = filteredPhoneNumbers.filter(pn => 
-                    pn.do_not_call === filters.doNotCall
-                );
-            }
-
-            return filteredPhoneNumbers;
-
-        } catch (error) {
-            console.error('Error generating phone numbers from calls:', error.message);
-            return [];
-        }
-    }
+    // (Removed) generatePhoneNumbersFromCalls - unused
 
     /**
      * Get phone number by ID

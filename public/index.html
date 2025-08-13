@@ -3387,72 +3387,11 @@
 
         // Remove alternative sequence details rendering (use dedicated modal with loadSequenceDetails)
 
-        // Start batch calling
-        async function startBatchCalling() {
-            try {
-                const response = await fetch(`${API_BASE}/api/sequences/batch-queue?limit=10`);
-                const data = await response.json();
-                
-                if (data.success && data.queue.length > 0) {
-                    alert(`Starting batch calling with ${data.queue.length} entries`);
-                    // TODO: Implement actual batch calling logic
-                } else {
-                    alert('No entries ready for calling');
-                }
-            } catch (error) {
-                console.error('Error starting batch calling:', error);
-                alert('Error starting batch calling');
-            }
-        }
+        // (Removed) startBatchCalling - unused
 
-        // View batch queue
-        async function viewBatchQueue() {
-            try {
-                const response = await fetch(`${API_BASE}/api/sequences/batch-queue?limit=10`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    showBatchQueueModal(data.queue);
-                } else {
-                    alert('Error loading batch queue');
-                }
-            } catch (error) {
-                console.error('Error loading batch queue:', error);
-                alert('Error loading batch queue');
-            }
-        }
+        // (Removed) viewBatchQueue - unused
 
-        // Show batch queue modal
-        function showBatchQueueModal(queue) {
-            const modal = document.getElementById('callDetailsModal');
-            const content = document.getElementById('callDetailsContent');
-            
-            const queueHtml = queue.length > 0 ? queue.map(entry => {
-                const contactName = entry.phone_numbers?.contacts ? 
-                    `${entry.phone_numbers.contacts.first_name || ''} ${entry.phone_numbers.contacts.last_name || ''}`.trim() : 'Unknown';
-                const nextCallTime = entry.next_call_time ? new Date(entry.next_call_time).toLocaleString() : 'Now';
-                
-                return `
-                    <div class="queue-item">
-                        <div class="queue-phone">${entry.phone_numbers?.phone_number || 'N/A'}</div>
-                        <div class="queue-contact">${contactName}</div>
-                        <div class="queue-attempt">${entry.current_attempt + 1}/${entry.sequences?.max_attempts || 3}</div>
-                        <div class="queue-time">${nextCallTime}</div>
-                    </div>
-                `;
-            }).join('') : '<div class="no-data">No entries ready for calling</div>';
-            
-            content.innerHTML = `
-                <div class="call-detail-section">
-                    <h4>📋 Batch Calling Queue</h4>
-                    <div class="queue-list">
-                        ${queueHtml}
-                    </div>
-                </div>
-            `;
-            
-            modal.style.display = 'block';
-        }
+        // (Removed) showBatchQueueModal - unused
 
         // Show contact modal for adding/editing
         function showContactModal(contact = null, mode = 'add') {

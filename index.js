@@ -147,22 +147,7 @@ app.get('/elevenlabs/agents', async (req, res) => {
 
 // (Removed) ElevenLabs phone numbers endpoint - unused
 
-// ElevenLabs conversation details endpoint
-app.get('/elevenlabs/conversation/:conversationId', async (req, res) => {
-    try {
-        const { conversationId } = req.params;
-        const conversationDetails = await elevenLabsService.getConversationDetails(conversationId);
-        res.json({
-            success: true,
-            conversation: conversationDetails
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-});
+// (Removed) ElevenLabs conversation details endpoint - unused
 
 // ElevenLabs webhook endpoint for call completion
 app.post('/webhook/elevenlabs-call-ended', async (req, res) => {
@@ -564,30 +549,7 @@ function processCallDataForCharts(calls) {
     };
 }
 
-// Get calls by phone number
-app.get('/api/calls/phone/:phoneNumber', async (req, res) => {
-    try {
-        const { phoneNumber } = req.params;
-        
-        console.log(`📞 Fetching calls for phone: ${phoneNumber}`);
-        
-        const calls = await supabaseDb.getCallsByPhoneNumber(phoneNumber);
-        
-        res.json({
-            success: true,
-            calls: calls,
-            count: calls.length,
-            phoneNumber: phoneNumber
-        });
-        
-    } catch (error) {
-        console.error('❌ Error fetching calls by phone:', error.message);
-        res.status(500).json({
-            success: false,
-            message: `Failed to fetch calls: ${error.message}`
-        });
-    }
-});
+// (Removed) GET /api/calls/phone/:phoneNumber - unused
 
 // ===== CONTACTS API ENDPOINTS =====
 
@@ -1031,30 +993,7 @@ app.post('/api/sequences', async (req, res) => {
     }
 });
 
-// Add phone number to sequence
-app.post('/api/sequences/:sequenceId/phone-numbers', async (req, res) => {
-    try {
-        const { sequenceId } = req.params;
-        const { phoneNumberId } = req.body;
-        
-        console.log(`➕ Adding phone number ${phoneNumberId} to sequence ${sequenceId}`);
-        
-        const sequenceEntry = await supabaseDb.addPhoneNumberToSequence(sequenceId, phoneNumberId);
-        
-        res.json({
-            success: true,
-            sequenceEntry: sequenceEntry,
-            message: 'Phone number added to sequence successfully'
-        });
-        
-    } catch (error) {
-        console.error('❌ Error adding phone number to sequence:', error.message);
-        res.status(500).json({
-            success: false,
-            message: `Failed to add phone number to sequence: ${error.message}`
-        });
-    }
-});
+// (Removed) Single-add sequence endpoint - unused in favor of batch entries
 
 // ===== SEQUENCE MANAGEMENT API ENDPOINTS =====
 
@@ -1102,29 +1041,7 @@ app.get('/api/sequences/statistics', async (req, res) => {
     }
 });
 
-// Get batch calling queue
-app.get('/api/sequences/batch-queue', async (req, res) => {
-    try {
-        const { limit = 10 } = req.query;
-        
-        console.log(`🔄 Fetching batch calling queue (limit: ${limit})`);
-        
-        const queue = await supabaseDb.getBatchCallingQueue(parseInt(limit));
-        
-        res.json({
-            success: true,
-            queue: queue,
-            count: queue.length
-        });
-        
-    } catch (error) {
-        console.error('❌ Error fetching batch calling queue:', error.message);
-        res.status(500).json({
-            success: false,
-            message: `Failed to fetch batch calling queue: ${error.message}`
-        });
-    }
-});
+// (Removed) GET /api/sequences/batch-queue - unused
 
 // Update sequence status (pause/resume)
 app.put('/api/sequences/:sequenceId/status', async (req, res) => {

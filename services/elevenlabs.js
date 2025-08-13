@@ -108,33 +108,7 @@ class ElevenLabsService {
         }
     }
 
-    /**
-     * Get conversation details, including the transcript
-     * @param {string} conversationId - The ID of the conversation
-     * @returns {Promise<Object>} The conversation details
-     */
-    async getConversationDetails(conversationId) {
-        try {
-            console.log(`📋 Retrieving conversation details for ${conversationId}...`);
-            
-            const response = await this.client.get(`/convai/conversations/${conversationId}`);
-            
-            console.log(`✅ Conversation details retrieved successfully`);
-            console.log(`📊 Total messages: ${response.data.messages?.length || 0}`);
-            
-            return {
-                success: true,
-                conversation_id: conversationId,
-                messages: response.data.messages || [],
-                metadata: response.data.metadata || {},
-                transcript: this.generateTranscript(response.data.messages || []),
-                total_messages: response.data.messages?.length || 0
-            };
-        } catch (error) {
-            console.error('❌ Error getting ElevenLabs conversation details:', error.response?.data || error.message);
-            throw new Error('Failed to get conversation details');
-        }
-    }
+    // (Removed) getConversationDetails - prefer getConversationDetailsEnhanced
 
     /**
      * Generate transcript from conversation messages
@@ -216,40 +190,9 @@ class ElevenLabsService {
         }
     }
 
-    /**
-     * Get call history for a specific agent
-     * @param {string} agentId - The agent ID
-     * @param {Object} options - Query options
-     * @returns {Promise<Array>} Call history
-     */
-    async getCallHistory(agentId, options = {}) {
-        try {
-            const params = new URLSearchParams();
-            if (options.limit) params.append('limit', options.limit);
-            if (options.offset) params.append('offset', options.offset);
-            
-            const response = await this.client.get(`/convai/agents/${agentId}/calls?${params.toString()}`);
-            return response.data;
-        } catch (error) {
-            console.error('❌ Error getting call history:', error.response?.data || error.message);
-            throw new Error('Failed to get call history');
-        }
-    }
+    // (Removed) getCallHistory - unused
 
-    /**
-     * Get detailed call information
-     * @param {string} callId - The call ID
-     * @returns {Promise<Object>} Detailed call information
-     */
-    async getCallDetails(callId) {
-        try {
-            const response = await this.client.get(`/convai/calls/${callId}`);
-            return response.data;
-        } catch (error) {
-            console.error('❌ Error getting call details:', error.response?.data || error.message);
-            throw new Error('Failed to get call details');
-        }
-    }
+    // (Removed) getCallDetails - unused
 
     /**
      * Get all conversations from ElevenLabs account (comprehensive call history)

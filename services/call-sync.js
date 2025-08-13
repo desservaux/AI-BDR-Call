@@ -368,45 +368,7 @@ class CallSyncService {
         }
     }
 
-
-
-    /**
-     * Check if a call was initiated through our app (internal) or externally
-     * @param {Object} conversation - ElevenLabs conversation data
-     * @returns {boolean} True if internal call
-     */
-    isInternalCall(conversation) {
-        // For now, we'll consider all calls as potentially external
-        // In the future, we can add logic to identify internal calls
-        // based on specific patterns or metadata
-        return false;
-    }
-
-    /**
-     * Validate if a conversation should be treated as a real call
-     * @param {Object} conversation - ElevenLabs conversation data
-     * @returns {boolean} True if valid call conversation
-     */
-    isValidCallConversation(conversation) {
-        // Must have a conversation ID
-        if (!conversation.conversation_id) {
-            return false;
-        }
-
-        // Must have a status
-        if (!conversation.status) {
-            return false;
-        }
-
-        // Only skip if phone number is explicitly "unknown", "test", or empty
-        const phoneNumber = conversation.to_number || conversation.phone_number || 
-                           (conversation.metadata && conversation.metadata.external_number);
-        if (phoneNumber === 'unknown' || phoneNumber === 'test' || phoneNumber === '') {
-            return false;
-        }
-
-        return true;
-    }
+    
 
     /**
      * Store Gemini analysis results in the database
@@ -491,25 +453,7 @@ class CallSyncService {
         return 'unknown reason';
     }
 
-    /**
-     * Check if an existing call needs to be updated
-     * @param {Object} existingCall - Existing call from database
-     * @param {Object} conversation - ElevenLabs conversation data
-     * @returns {boolean} True if update is needed
-     */
-    needsUpdate(existingCall, conversation) {
-        // Check if any important fields have changed
-        const newCallResult = conversation.call_result;
-        const newDuration = conversation.duration || conversation.call_duration_secs || 0;
-        const newMessageCount = conversation.message_count || 0;
-
-        return (
-            existingCall.call_result !== newCallResult ||
-            existingCall.duration_seconds !== newDuration ||
-            existingCall.message_count !== newMessageCount ||
-            existingCall.phone_number !== (conversation.to_number || conversation.phone_number)
-        );
-    }
+    
 
     /**
      * Get sync statistics
