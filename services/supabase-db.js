@@ -2219,7 +2219,8 @@ class SupabaseDBService {
                 contacts_created: 0,
                 phone_numbers_created: 0,
                 errors: [],
-                duplicates: 0
+                duplicates: 0,
+                phone_number_ids: []
             };
 
             for (let i = 0; i < dataRows.length; i++) {
@@ -2233,11 +2234,14 @@ class SupabaseDBService {
                     if (uploadResult.contact_created) result.contacts_created++;
                     if (uploadResult.phone_created) result.phone_numbers_created++;
                     if (uploadResult.duplicate) result.duplicates++;
+                    if (uploadResult.phone_number_id) result.phone_number_ids.push(uploadResult.phone_number_id);
                     
                 } catch (error) {
                     result.errors.push(`Row ${i + 2}: ${error.message}`);
                 }
             }
+            // Deduplicate collected phone number IDs
+            result.phone_number_ids = Array.from(new Set(result.phone_number_ids));
 
             console.log(`✅ CSV processing complete: ${result.contacts_created} contacts, ${result.phone_numbers_created} phone numbers`);
             return result;
@@ -2279,7 +2283,8 @@ class SupabaseDBService {
                 contacts_created: 0,
                 phone_numbers_created: 0,
                 errors: [],
-                duplicates: 0
+                duplicates: 0,
+                phone_number_ids: []
             };
 
             for (let i = 0; i < dataRows.length; i++) {
@@ -2293,11 +2298,14 @@ class SupabaseDBService {
                     if (uploadResult.contact_created) result.contacts_created++;
                     if (uploadResult.phone_created) result.phone_numbers_created++;
                     if (uploadResult.duplicate) result.duplicates++;
+                    if (uploadResult.phone_number_id) result.phone_number_ids.push(uploadResult.phone_number_id);
                     
                 } catch (error) {
                     result.errors.push(`Row ${i + 2}: ${error.message}`);
                 }
             }
+            // Deduplicate collected phone number IDs
+            result.phone_number_ids = Array.from(new Set(result.phone_number_ids));
 
             console.log(`✅ XLSX processing complete: ${result.contacts_created} contacts, ${result.phone_numbers_created} phone numbers`);
             return result;
@@ -2319,9 +2327,8 @@ class SupabaseDBService {
             // First process the CSV normally
             const uploadResult = await this.processCSVUpload(csvContent);
             
-            // Then add all phone numbers to the sequence
-            const phoneNumbers = await this.getPhoneNumbers();
-            const phoneNumberIds = (phoneNumbers || []).map(p => p.id);
+            // Then add only the phone numbers from this upload to the sequence
+            const phoneNumberIds = Array.isArray(uploadResult.phone_number_ids) ? uploadResult.phone_number_ids : [];
             const sequenceResult = await this.addPhoneNumbersToSequence(sequenceId, phoneNumberIds);
             
             uploadResult.sequence_additions = sequenceResult.added;
@@ -2346,9 +2353,8 @@ class SupabaseDBService {
             // First process the XLSX normally
             const uploadResult = await this.processXLSXUpload(xlsxBuffer);
             
-            // Then add all phone numbers to the sequence
-            const phoneNumbers = await this.getPhoneNumbers();
-            const phoneNumberIds = (phoneNumbers || []).map(p => p.id);
+            // Then add only the phone numbers from this upload to the sequence
+            const phoneNumberIds = Array.isArray(uploadResult.phone_number_ids) ? uploadResult.phone_number_ids : [];
             const sequenceResult = await this.addPhoneNumbersToSequence(sequenceId, phoneNumberIds);
             
             uploadResult.sequence_additions = sequenceResult.added;
@@ -2422,7 +2428,8 @@ class SupabaseDBService {
             duplicate: false,
             blocked: false,
             partial_import: false,
-            message: ''
+            message: '',
+            phone_number_id: null
         };
 
         try {
@@ -2450,6 +2457,7 @@ class SupabaseDBService {
                 result.duplicate = true;
                 result.blocked = true;
                 result.message = `Phone number ${normalizedPhone} already exists`;
+                result.phone_number_id = existingPhone.id;
                 return result;
             }
 
@@ -2499,6 +2507,7 @@ class SupabaseDBService {
             if (createPhoneError) throw createPhoneError;
             
             result.phone_created = true;
+            result.phone_number_id = phone.id;
             result.message = 'Contact and phone number created successfully';
             return result;
 

@@ -30,14 +30,18 @@ Project Status Board
 - [x] 3) Deduplicate/count in `addPhoneNumbersToSequence`
 - [x] 4) Ensure API response includes `alreadyInSequence` in result
 - [ ] 5) Sanity test manual verification (pending user test)
+- [x] 6) Fix upload-to-sequence flooding bug: restrict additions to IDs from the current upload only
 
 Current Status / Progress Tracking
 - Implemented service changes in `services/supabase-db.js`.
 - Bulk endpoint now returns `result` with `added`, `alreadyInSequence`, `errors`.
 - No server code changes required for the bulk endpoint beyond consuming result (already done previously).
+- Implemented fix: `processCSVUpload`/`processXLSXUpload` now aggregate `phone_number_ids` from `processContactRow`.
+- `processCSVUploadToSequence`/`processXLSXUploadToSequence` now pass only those IDs to `addPhoneNumbersToSequence` (removed unfiltered `getPhoneNumbers()` calls).
 
 Executor's Feedback or Assistance Requests
 - Do you want the single-add endpoint `POST /api/sequences/:sequenceId/phone-numbers` to explicitly report when the entry already exists (e.g., message change), or keep current behavior?
+ - Please confirm if we should also surface, in the upload UI, a summary like: "X added to sequence, Y were duplicates, Z rows invalid." I can wire this to frontend.
 
 Design Analysis and Recommendations
 - N/A for this backend change. If the frontend surfaces counts, suggest messaging like: "X added, Y already in sequence." and surface per-item errors when present.
@@ -45,6 +49,7 @@ Design Analysis and Recommendations
 Lessons
 - Supabase PostgREST "no rows" error code is `PGRST116` and should be treated as not found rather than failure.
 - Postgres unique violation code `23505` is expected for race conditions; treat as an "exists" outcome, not an error.
+ - Avoid broad `getPhoneNumbers()` during scoped operations. Collect and pass explicit IDs from the operation context to prevent unintended bulk actions.
 # ElevenLabs Voice Agent - Production Ready System
 
 ## Background and Motivation
