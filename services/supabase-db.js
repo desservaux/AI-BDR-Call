@@ -1172,7 +1172,8 @@ class SupabaseDBService {
                         last_name,
                         email,
                         company_name,
-                        position
+                        position,
+                        do_not_call
                     )
                 `)
                 .order('created_at', { ascending: false });
@@ -1683,7 +1684,8 @@ class SupabaseDBService {
                             id,
                             first_name,
                             last_name,
-                            company_name
+                            company_name,
+                            do_not_call
                         )
                     )
                 `)
@@ -1827,6 +1829,24 @@ class SupabaseDBService {
      */
     async findActiveSequenceEntriesForPhoneNumber(phoneNumber) {
         try {
+            const normalized = this.normalizePhoneNumber(phoneNumber) || phoneNumber;
+
+            // Step 1: resolve phone_number id
+            const { data: pn, error: pnError } = await this.client
+                .from('phone_numbers')
+                .select('id')
+                .eq('phone_number', normalized)
+                .single();
+
+            if (pnError) {
+                if (pnError.code === 'PGRST116') {
+                    return [];
+                }
+                throw pnError;
+            }
+            if (!pn) return [];
+
+            // Step 2: fetch active sequence entries by phone_number_id
             const { data, error } = await this.client
                 .from('sequence_entries')
                 .select(`
@@ -1849,12 +1869,12 @@ class SupabaseDBService {
                         )
                     )
                 `)
-                .eq('phone_numbers.phone_number', phoneNumber)
+                .eq('phone_number_id', pn.id)
                 .eq('status', 'active');
 
             if (error) throw error;
-            
-            console.log(`✅ Found ${data.length} active sequence entries for ${phoneNumber}`);
+
+            console.log(`✅ Found ${data.length} active sequence entries for ${normalized}`);
             return data || [];
         } catch (error) {
             console.error('Error finding active sequence entries for phone number:', error.message);
@@ -2121,6 +2141,24 @@ class SupabaseDBService {
      */
     async getSequenceEntryByPhoneNumber(phoneNumber) {
         try {
+            const normalized = this.normalizePhoneNumber(phoneNumber) || phoneNumber;
+
+            // Step 1: resolve phone_number id
+            const { data: pn, error: pnError } = await this.client
+                .from('phone_numbers')
+                .select('id')
+                .eq('phone_number', normalized)
+                .single();
+
+            if (pnError) {
+                if (pnError.code === 'PGRST116') {
+                    return null;
+                }
+                throw pnError;
+            }
+            if (!pn) return null;
+
+            // Step 2: fetch active sequence entry by phone_number_id
             const { data, error } = await this.client
                 .from('sequence_entries')
                 .select(`
@@ -2130,12 +2168,12 @@ class SupabaseDBService {
                         phone_number
                     )
                 `)
-                .eq('phone_numbers.phone_number', phoneNumber)
+                .eq('phone_number_id', pn.id)
                 .eq('status', 'active')
                 .single();
 
             if (error) throw error;
-            
+
             return data;
         } catch (error) {
             console.error('Error getting sequence entry by phone number:', error.message);
@@ -2359,7 +2397,7 @@ class SupabaseDBService {
             notes: data.notes || '',
             phone_number: data.phone_number,
             phone_type: data.phone_type || 'mobile',
-            is_primary: data.is_primary === 'true' || data.is_primary === '1',
+            is_primary: (data.is_primary === '' || data.is_primary == null) ? undefined : (data.is_primary === 'true' || data.is_primary === '1'),
             do_not_call: data.do_not_call === 'true' || data.do_not_call === '1'
         };
     }

@@ -3046,8 +3046,9 @@
             }
             
             const phoneNumbersHtml = phoneNumbers.map(phone => {
-                const statusClass = phone.do_not_call ? 'status-do-not-call' : 'status-active';
-                const statusText = phone.do_not_call ? 'Do Not Call' : 'Active';
+                const isDnc = !!(phone.do_not_call || phone.contacts?.do_not_call);
+                const statusClass = isDnc ? 'status-do-not-call' : 'status-active';
+                const statusText = isDnc ? 'Do Not Call' : 'Active';
                 const contactName = phone.contacts ? `${phone.contacts.first_name || ''} ${phone.contacts.last_name || ''}`.trim() : 'Unknown';
                 const companyName = phone.contacts?.company_name || 'N/A';
                 

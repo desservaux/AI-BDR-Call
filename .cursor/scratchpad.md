@@ -33,6 +33,8 @@ Project Status Board
 - [x] 6) Fix upload-to-sequence flooding bug: restrict additions to IDs from the current upload only
  - [x] 7) Fix CSV/XLSX import coercing `is_primary=false` to true
  - [x] 8) Fix Supabase testConnection to use head+count instead of selecting non-existent `count` column
+ - [x] 9) Fix sequence entry lookup by phone number (avoid joined-column filtering); use two-step ID resolution
+ - [x] 10) Fix `/test-elevenlabs` endpoint to reflect provider availability and return 503 when unavailable
 
 Current Status / Progress Tracking
 - Implemented service changes in `services/supabase-db.js`.
@@ -42,6 +44,8 @@ Current Status / Progress Tracking
 - `processCSVUploadToSequence`/`processXLSXUploadToSequence` now pass only those IDs to `addPhoneNumbersToSequence` (removed unfiltered `getPhoneNumbers()` calls).
  - Fixed `services/supabase-db.js#processContactRow`: `is_primary` now uses nullish coalescing `rowData.is_primary ?? true` to preserve explicit `false` from user input.
  - Fixed `services/supabase-db.js#testConnection`: replaced `.select('count')` with `.select('*', { count: 'exact', head: true })` to avoid missing column errors and prevent init blocking.
+ - Fixed `services/supabase-db.js#getSequenceEntryByPhoneNumber` and `findActiveSequenceEntriesForPhoneNumber`: replaced unreliable `.eq('phone_numbers.phone_number', ...)` joined-column filter with two-step lookup (`phone_numbers.id` by string, then `.eq('phone_number_id', id)`). Includes phone normalization.
+ - Fixed `index.js#/test-elevenlabs`: now returns `success: false` with HTTP 503 when provider test fails; UI can correctly show "Disconnected" and disable call actions.
 
 Executor's Feedback or Assistance Requests
 - Do you want the single-add endpoint `POST /api/sequences/:sequenceId/phone-numbers` to explicitly report when the entry already exists (e.g., message change), or keep current behavior?
@@ -55,6 +59,7 @@ Lessons
 - Postgres unique violation code `23505` is expected for race conditions; treat as an "exists" outcome, not an error.
  - Avoid broad `getPhoneNumbers()` during scoped operations. Collect and pass explicit IDs from the operation context to prevent unintended bulk actions.
  - Boolean defaults: use nullish coalescing (`??`) not `||` when you must preserve explicit `false` values from parsed input.
+ - Supabase/PostgREST: Avoid filtering on embedded (joined) resource fields via the JS client (e.g., `.eq('phone_numbers.phone_number', ...)`). Resolve the foreign key id first, then filter on base table columns.
 # ElevenLabs Voice Agent - Production Ready System
 
 ## Background and Motivation

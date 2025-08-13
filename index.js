@@ -64,7 +64,14 @@ app.get('/health', (req, res) => {
 app.get('/test-elevenlabs', async (req, res) => {
     try {
         const result = await elevenLabsService.testConnection();
-        res.json({
+        if (!result.success) {
+            return res.status(503).json({
+                success: false,
+                message: result.message || 'ElevenLabs service unavailable',
+                data: result
+            });
+        }
+        return res.json({
             success: true,
             message: 'ElevenLabs service test successful',
             data: result
