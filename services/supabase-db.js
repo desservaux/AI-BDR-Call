@@ -850,9 +850,10 @@ class SupabaseDBService {
      */
     async deleteCallsByCriteria(criteria) {
         try {
-            let query = this.client
-                .from('calls')
-                .delete();
+			let query = this.client
+				.from('calls')
+				.delete()
+				.select('id');
 
             // Apply criteria
             if (criteria.elevenlabs_conversation_id === null) {
@@ -862,12 +863,12 @@ class SupabaseDBService {
                 query = query.eq('phone_number', criteria.phone_number);
             }
 
-            const { data, error } = await query;
+			const { data, error } = await query;
 
             if (error) throw error;
 
-            console.log(`✅ Deleted ${data?.length || 0} calls matching criteria`);
-            return data?.length || 0;
+			console.log(`✅ Deleted ${data?.length || 0} calls matching criteria`);
+			return data?.length || 0;
         } catch (error) {
             console.error('Error deleting calls by criteria:', error.message);
             throw new Error(`Failed to delete calls by criteria: ${error.message}`);
@@ -1653,6 +1654,36 @@ class SupabaseDBService {
 
     // ===== SEQUENCE MANAGEMENT LOGIC =====
 
+	/**
+	 * Atomically claim a ready sequence entry to prevent concurrent processing
+	 * Uses an optimistic lock by advancing next_call_time briefly so others won't pick it up
+	 * @param {string} entryId - Sequence entry ID
+	 * @param {number} lockSeconds - How long to hold the claim lock (seconds)
+	 * @returns {Promise<boolean>} True if claimed; false if already claimed by another worker
+	 */
+	async claimSequenceEntry(entryId, lockSeconds = 120) {
+		try {
+			const nowIso = new Date().toISOString();
+			const lockUntilIso = new Date(Date.now() + lockSeconds * 1000).toISOString();
+
+			const { data, error } = await this.client
+				.from('sequence_entries')
+				.update({ next_call_time: lockUntilIso, updated_at: nowIso })
+				.eq('id', entryId)
+				.eq('status', 'active')
+				.lte('next_call_time', nowIso)
+				.select('id')
+				.single();
+
+			// PGRST116 => No rows found/updated, treat as not claimed
+			if (error && error.code !== 'PGRST116') throw error;
+			return !!data;
+		} catch (error) {
+			console.error('Error claiming sequence entry:', error.message);
+			throw new Error(`Failed to claim sequence entry: ${error.message}`);
+		}
+	}
+
     /**
      * Get sequence entries that are ready for calling
      * @param {number} limit - Maximum number of entries to return
@@ -2043,35 +2074,51 @@ class SupabaseDBService {
 
             if (error) throw error;
 
-            const stats = {
-                total_entries: data.length,
-                active_entries: 0,
-                completed_entries: 0,
-                max_attempts_reached: 0,
-                stopped_entries: 0,
-                average_attempts: 0,
-                sequences: {}
-            };
+			const stats = {
+				total_entries: data.length,
+				active_entries: 0,
+				completed_entries: 0,
+				max_attempts_reached: 0,
+				stopped_entries: 0,
+				average_attempts: 0,
+				sequences: {}
+			};
 
             let totalAttempts = 0;
 
-            data.forEach(entry => {
-                stats[`${entry.status}_entries`]++;
-                totalAttempts += entry.current_attempt;
+			data.forEach(entry => {
+				// Normalize top-level status keys
+				const topKeyMap = {
+					active: 'active_entries',
+					completed: 'completed_entries',
+					max_attempts_reached: 'max_attempts_reached',
+					stopped: 'stopped_entries'
+				};
+				const topKey = topKeyMap[entry.status] || 'active_entries';
+				stats[topKey]++;
+				totalAttempts += entry.current_attempt;
 
-                // Group by sequence
-                const sequenceName = entry.sequences?.name || 'Unknown';
-                if (!stats.sequences[sequenceName]) {
-                    stats.sequences[sequenceName] = {
-                        total: 0,
-                        active: 0,
-                        completed: 0,
-                        max_attempts_reached: 0
-                    };
-                }
-                stats.sequences[sequenceName].total++;
-                stats.sequences[sequenceName][`${entry.status}_entries`]++;
-            });
+				// Group by sequence with normalized keys
+				const sequenceName = entry.sequences?.name || 'Unknown';
+				if (!stats.sequences[sequenceName]) {
+					stats.sequences[sequenceName] = {
+						total: 0,
+						active: 0,
+						completed: 0,
+						max_attempts_reached: 0,
+						stopped: 0
+					};
+				}
+				stats.sequences[sequenceName].total++;
+				const seqKeyMap = {
+					active: 'active',
+					completed: 'completed',
+					max_attempts_reached: 'max_attempts_reached',
+					stopped: 'stopped'
+				};
+				const seqKey = seqKeyMap[entry.status] || 'active';
+				stats.sequences[sequenceName][seqKey]++;
+			});
 
             stats.average_attempts = data.length > 0 ? Math.round(totalAttempts / data.length * 100) / 100 : 0;
 

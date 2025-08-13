@@ -95,41 +95,59 @@ class CallSyncService {
                 details: []
             };
 
-            // Fetch all conversations from ElevenLabs
-            const conversationsResult = await this.elevenLabsService.getAllConversations({
-                limit: options.limit || 100,
-                start_date: options.start_date,
-                end_date: options.end_date
-            });
+            // Fetch all conversations from ElevenLabs with pagination
+            let cursor = options.cursor || null;
+            let totalProcessedConversations = 0;
 
-            if (!conversationsResult.success) {
-                throw new Error('Failed to fetch conversations from ElevenLabs');
-            }
+            while (true) {
+                const page = await this.elevenLabsService.getAllConversations({
+                    limit: options.limit || 100,
+                    cursor,
+                    start_date: options.start_date,
+                    end_date: options.end_date
+                });
 
-            syncResults.total_conversations = conversationsResult.conversations.length;
-            console.log(`📊 Processing ${syncResults.total_conversations} conversations...`);
-
-            // Process each conversation
-            for (const conversation of conversationsResult.conversations) {
-                try {
-                    const result = await this.processConversation(conversation, options);
-                    
-                    if (result.is_new) {
-                        syncResults.new_calls++;
-                    } else if (result.is_updated) {
-                        syncResults.updated_calls++;
-                    }
-                    
-                    if (result.is_external) {
-                        syncResults.external_calls++;
-                    }
-
-                    syncResults.details.push(result);
-                } catch (error) {
-                    console.error(`❌ Error processing conversation ${conversation.conversation_id}:`, error.message);
-                    syncResults.errors++;
+                if (!page.success) {
+                    throw new Error('Failed to fetch conversations from ElevenLabs');
                 }
+
+                console.log(`📊 Processing page with ${page.conversations.length} conversations...`);
+
+                // Process each conversation in this page
+                for (const conversation of page.conversations) {
+                    try {
+                        const result = await this.processConversation(conversation, options);
+                        
+                        if (result.is_new) {
+                            syncResults.new_calls++;
+                        } else if (result.is_updated) {
+                            syncResults.updated_calls++;
+                        }
+                        
+                        if (result.is_external) {
+                            syncResults.external_calls++;
+                        }
+
+                        syncResults.details.push(result);
+                    } catch (error) {
+                        console.error(`❌ Error processing conversation ${conversation.conversation_id}:`, error.message);
+                        syncResults.errors++;
+                    }
+                }
+
+                totalProcessedConversations += page.conversations.length;
+
+                // Break if there are no more pages
+                if (!page.has_more || !page.next_cursor) {
+                    break;
+                }
+
+                // Advance cursor to next page
+                cursor = page.next_cursor;
+                console.log(`➡️  Fetching next page with cursor: ${cursor}`);
             }
+
+            syncResults.total_conversations = totalProcessedConversations;
 
             // Update last sync time
             this.lastSyncTime = new Date();

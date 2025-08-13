@@ -86,7 +86,15 @@ class SequenceManagerService {
                         continue;
                     }
 
-                    const phoneNumber = entry.phone_numbers.phone_number;
+
+					// Attempt to claim the entry to avoid concurrent processing
+					const claimed = await this.dbService.claimSequenceEntry(entry.id);
+					if (!claimed) {
+						console.log(`⏭️ Skipping entry ${entry.id} - already claimed by another worker`);
+						continue;
+					}
+
+					const phoneNumber = entry.phone_numbers.phone_number;
                     console.log(`📞 Initiating call to ${phoneNumber} (attempt ${entry.current_attempt + 1}/${entry.sequences.max_attempts})`);
 
                     // Make the call via ElevenLabs (fire and forget) with correct signature

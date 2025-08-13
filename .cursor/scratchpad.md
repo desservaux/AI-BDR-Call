@@ -35,6 +35,10 @@ Project Status Board
  - [x] 8) Fix Supabase testConnection to use head+count instead of selecting non-existent `count` column
  - [x] 9) Fix sequence entry lookup by phone number (avoid joined-column filtering); use two-step ID resolution
  - [x] 10) Fix `/test-elevenlabs` endpoint to reflect provider availability and return 503 when unavailable
+ - [x] 11) ElevenLabs sync pagination: iterate through `next_cursor` until `has_more` is false
+ - [x] 12) Add atomic claim for sequence entries to prevent concurrent dialing
+ - [x] 13) Fix cleanup API delete count by chaining `.select('id')` after delete
+ - [x] 14) Fix sequence statistics counters: normalize status keys for totals and per-sequence groups
 
 Current Status / Progress Tracking
 - Implemented service changes in `services/supabase-db.js`.
@@ -46,6 +50,10 @@ Current Status / Progress Tracking
  - Fixed `services/supabase-db.js#testConnection`: replaced `.select('count')` with `.select('*', { count: 'exact', head: true })` to avoid missing column errors and prevent init blocking.
  - Fixed `services/supabase-db.js#getSequenceEntryByPhoneNumber` and `findActiveSequenceEntriesForPhoneNumber`: replaced unreliable `.eq('phone_numbers.phone_number', ...)` joined-column filter with two-step lookup (`phone_numbers.id` by string, then `.eq('phone_number_id', id)`). Includes phone normalization.
  - Fixed `index.js#/test-elevenlabs`: now returns `success: false` with HTTP 503 when provider test fails; UI can correctly show "Disconnected" and disable call actions.
+ - 2025-08-13: Implemented full pagination in `services/call-sync.js#syncAllConversations`. The sync now loops through pages using `next_cursor`/`has_more` from `getAllConversations`, ensuring older calls are not missed. Updated `syncResults.total_conversations` to reflect all processed pages and added logs per page.
+ - 2025-08-13: Implemented optimistic locking for sequence dialing via `claimSequenceEntry(entryId)`. `processReadySequenceEntries` now claims before dialing; unclaimed entries are skipped, preventing concurrent initiation.
+ - 2025-08-13: Fixed `deleteCallsByCriteria` to return accurate deleted counts by adding `.select('id')` to the delete query; cleanup API now reports real numbers.
+ - 2025-08-13: Corrected `getSequenceStatisticsForSequence` counters by mapping statuses to consistent keys (top-level and per-sequence); UI counts now match actual data.
 
 Executor's Feedback or Assistance Requests
 - Do you want the single-add endpoint `POST /api/sequences/:sequenceId/phone-numbers` to explicitly report when the entry already exists (e.g., message change), or keep current behavior?
@@ -59,7 +67,9 @@ Lessons
 - Postgres unique violation code `23505` is expected for race conditions; treat as an "exists" outcome, not an error.
  - Avoid broad `getPhoneNumbers()` during scoped operations. Collect and pass explicit IDs from the operation context to prevent unintended bulk actions.
  - Boolean defaults: use nullish coalescing (`??`) not `||` when you must preserve explicit `false` values from parsed input.
- - Supabase/PostgREST: Avoid filtering on embedded (joined) resource fields via the JS client (e.g., `.eq('phone_numbers.phone_number', ...)`). Resolve the foreign key id first, then filter on base table columns.
+ - Supabase/PostgREST: Avoid filtering on embedded (joined) resource fields via the JS client (e.g., `.eq('phone_numbers.phone_number', ...)`). Resolve the foreign key id first, then filter on base table columns. Includes phone normalization.
+ - ElevenLabs pagination: The `conversations` endpoint returns `has_more` and `next_cursor`; always loop until exhaustion to avoid missing older calls.
+ - Sequence concurrency: Use an atomic claim by advancing `next_call_time` briefly and matching on `status='active'` and `next_call_time <= now` to prevent duplicate processing across workers.
 # ElevenLabs Voice Agent - Production Ready System
 
 ## Background and Motivation
