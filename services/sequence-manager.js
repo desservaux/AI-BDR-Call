@@ -93,8 +93,10 @@ class SequenceManagerService {
                     }
 
 
-					// Attempt to claim the entry to avoid concurrent processing
-					const claimed = await this.dbService.claimSequenceEntry(entry.id);
+                    // Attempt to claim the entry to avoid concurrent processing
+                    const envLockSeconds = parseInt(process.env.SEQUENCE_CALLER_LOCK_SECONDS || '120', 10);
+                    const lockSeconds = Number.isFinite(envLockSeconds) && envLockSeconds > 0 ? envLockSeconds : 120;
+                    const claimed = await this.dbService.claimSequenceEntry(entry.id, lockSeconds);
 					if (!claimed) {
 						console.log(`⏭️ Skipping entry ${entry.id} - already claimed by another worker`);
 						continue;

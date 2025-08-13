@@ -3061,6 +3061,7 @@
                         <div class="contact-status ${statusClass}">${statusText}</div>
                         <div class="sequence-entries">0</div>
                         <div class="contact-actions">
+                            <button class="btn btn-small btn-primary" onclick="openAddToSequenceForPhone('${phone.id}', '${phone.phone_number}')">➕ To Seq</button>
                             <button class="btn btn-small btn-edit" onclick="editPhoneNumber('${phone.id}')">✏️</button>
                             <button class="btn btn-small btn-delete" onclick="deletePhoneNumber('${phone.id}')">🗑️</button>
                         </div>
@@ -4027,6 +4028,12 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
                 console.error('Error adding to sequence:', error);
                 alert('Failed to add items to sequence');
             }
+        }
+
+        // Open add to sequence modal for a specific phone
+        function openAddToSequenceForPhone(phoneId, phoneNumber) {
+            window.selectedItems = [{ id: phoneId, name: phoneNumber }];
+            showAddToSequenceModal(window.selectedItems);
         }
 
         // Edit sequence

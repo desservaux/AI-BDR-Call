@@ -13,6 +13,8 @@ dotenv.config();
 const elevenLabsService = require('./services/elevenlabs'); // ElevenLabs integration
 const callSync = require('./services/call-sync'); // Call sync service (already instantiated)
 const SupabaseDBService = require('./services/supabase-db'); // Database service
+const geminiAnalysisService = require('./services/gemini-analysis');
+const sequenceCaller = require('./services/sequence-caller');
 
 // Initialize services
 const supabaseDb = new SupabaseDBService();
@@ -338,7 +340,7 @@ app.post('/api/sync-calls', async (req, res) => {
         
         res.json({
             success: true,
-            message: 'Call sync completed successfully',
+            message: 'Call sync completed successfully (analysis continues in background)',
             syncedCount: syncResult.new_calls,
             totalCalls: syncResult.total_conversations,
             newCalls: syncResult.new_calls,
@@ -346,7 +348,8 @@ app.post('/api/sync-calls', async (req, res) => {
             externalCalls: syncResult.external_calls,
             errors: syncResult.errors,
             syncTime: syncResult.sync_duration_ms,
-            fakeCallsRemoved: cleanupResult.total_deleted
+            fakeCallsRemoved: cleanupResult.total_deleted,
+            analysisQueue: geminiAnalysisService.getRateLimitStatus()
         });
         
     } catch (error) {
@@ -355,6 +358,69 @@ app.post('/api/sync-calls', async (req, res) => {
             success: false,
             message: `Failed to sync calls: ${error.message}`
         });
+    }
+});
+
+// Gemini analysis status
+app.get('/api/gemini/status', async (req, res) => {
+    try {
+        const status = geminiAnalysisService.getRateLimitStatus();
+        res.json({ success: true, status });
+    } catch (error) {
+        console.error('❌ Error getting Gemini status:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Sequence caller status
+app.get('/api/sequence-caller/status', async (req, res) => {
+    try {
+        const status = sequenceCaller.getStatus();
+        res.json({ success: true, status });
+    } catch (error) {
+        console.error('❌ Error getting Sequence Caller status:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Backfill route: enqueue calls missing analysis
+app.post('/api/analysis/backfill', async (req, res) => {
+    try {
+        const db = new SupabaseDBService();
+        // Find calls that have transcripts and no booking_analysis
+        const missing = await db.getCallsMissingAnalysis ? db.getCallsMissingAnalysis() : null;
+
+        if (!missing) {
+            return res.status(501).json({ success: false, message: 'Backfill helper not implemented' });
+        }
+
+        let enqueued = 0;
+        for (const item of missing) {
+            try {
+                const details = await db.getCallDetails(item.id);
+                const transcriptions = (details.transcriptions || []).map(m => `${m.speaker}: ${m.message}`).join('\n');
+                if (!transcriptions) continue;
+                await geminiAnalysisService.analyzeTranscript(transcriptions, {
+                    duration_seconds: details.call?.duration_seconds,
+                    call_summary_title: details.call?.call_summary_title,
+                    conversation_id: details.call?.elevenlabs_conversation_id,
+                    call_id: item.id
+                }).then(async (result) => {
+                    if (result && result.success && result.analysis) {
+                        await db.insertBookingAnalysis({
+                            call_id: item.id,
+                            ...result.analysis
+                        });
+                    }
+                }).catch(() => {});
+                enqueued++;
+            } catch {}
+        }
+
+        res.json({ success: true, enqueued, status: geminiAnalysisService.getRateLimitStatus() });
+    } catch (error) {
+        console.error('❌ Backfill error:', error.message);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
@@ -1068,6 +1134,67 @@ app.put('/api/sequences/:sequenceId/status', async (req, res) => {
     }
 });
 
+// Add a phone number to the only active sequence (creates the phone number if needed)
+app.post('/api/sequences/entries/add-by-phone', async (req, res) => {
+    try {
+        const rawPhone = req.body.phone_number || req.body.phone || req.query.phone;
+        if (!rawPhone) {
+            return res.status(400).json({ success: false, message: 'phone_number is required' });
+        }
+
+        // Normalize phone number
+        const normalized = supabaseDb.normalizePhoneNumber(rawPhone);
+        if (!normalized) {
+            return res.status(400).json({ success: false, message: 'Invalid phone number format' });
+        }
+
+        // Find the only active sequence
+        const activeSequences = await supabaseDb.getSequences({ isActive: true });
+        if (!activeSequences || activeSequences.length === 0) {
+            return res.status(404).json({ success: false, message: 'No active sequences found' });
+        }
+        if (activeSequences.length > 1) {
+            return res.status(409).json({ success: false, message: 'Multiple active sequences found; specify sequenceId' });
+        }
+        const sequenceId = activeSequences[0].id;
+
+        // Ensure phone number exists or create it
+        let phoneNumberId = null;
+        try {
+            const { data: existingPhone, error: findErr } = await supabaseDb.client
+                .from('phone_numbers')
+                .select('id')
+                .eq('phone_number', normalized)
+                .single();
+            if (!findErr && existingPhone) {
+                phoneNumberId = existingPhone.id;
+            }
+        } catch (_) {}
+
+        if (!phoneNumberId) {
+            try {
+                const created = await supabaseDb.createPhoneNumber({
+                    contact_id: null,
+                    phone_number: normalized,
+                    phone_type: 'mobile',
+                    is_primary: true,
+                    do_not_call: false
+                });
+                phoneNumberId = created.id;
+            } catch (e) {
+                return res.status(500).json({ success: false, message: `Failed to create phone number: ${e.message}` });
+            }
+        }
+
+        // Add to sequence (idempotent via unique constraint inside service)
+        const result = await supabaseDb.addPhoneNumberToSequence(sequenceId, phoneNumberId);
+        return res.json({ success: true, sequenceId, phoneNumberId, result });
+    } catch (error) {
+        console.error('❌ Error adding phone to active sequence:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // Update sequence entry after call
 app.post('/api/sequences/entries/:entryId/update-after-call', async (req, res) => {
     try {
@@ -1586,4 +1713,25 @@ app.listen(PORT, () => {
     
     // Initialize services after server starts
     initializeServices();
+
+    // Start sequence caller if enabled
+    try {
+        sequenceCaller.start();
+    } catch (e) {
+        console.error('❌ Failed to start Sequence Caller:', e.message);
+    }
 });
+
+// Graceful shutdown
+async function shutdown() {
+    try {
+        await sequenceCaller.stop();
+    } catch (e) {
+        // ignore
+    } finally {
+        process.exit(0);
+    }
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

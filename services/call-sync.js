@@ -331,20 +331,24 @@ class CallSyncService {
                         .map(m => `${m.speaker || 'unknown'}: ${m.text || ''}`)
                         .join('\n');
 
-                    const result = await this.geminiService.analyzeTranscript(transcriptText, {
-                        duration_seconds: consolidatedData.duration,
-                        call_summary_title: consolidatedData.call_summary_title,
-                        conversation_id: conversationId,
-                        call_id: callId
-                    });
-
-                    if (result && result.success && result.analysis) {
-                        // Pass just the analysis object
-                        await this.storeAnalysisResults(callId, result.analysis);
-                        console.log(`✅ Gemini analysis completed for call ${callId}`);
-                    } else {
-                        console.log(`⚠️ Gemini analysis returned no analysis for call ${callId}`);
-                    }
+                    this.geminiService
+                        .analyzeTranscript(transcriptText, {
+                            duration_seconds: consolidatedData.duration,
+                            call_summary_title: consolidatedData.call_summary_title,
+                            conversation_id: conversationId,
+                            call_id: callId
+                        })
+                        .then((result) => {
+                            if (result && result.success && result.analysis) {
+                                return this.storeAnalysisResults(callId, result.analysis).then(() => {
+                                    console.log(`✅ Gemini analysis stored for call ${callId}`);
+                                });
+                            }
+                            console.log(`⚠️ Gemini analysis returned no analysis for call ${callId}`);
+                        })
+                        .catch((analysisError) => {
+                            console.warn(`⚠️ Gemini analysis failed for call ${callId}: ${analysisError.message}`);
+                        });
                 } catch (analysisError) {
                     console.warn(`⚠️ Gemini analysis failed for call ${callId}:`, analysisError.message);
                 }

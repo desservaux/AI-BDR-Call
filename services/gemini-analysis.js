@@ -7,12 +7,35 @@ class GeminiAnalysisService {
         this.genAI = null;
         this.initialized = false;
         
-        // Batch rate limiting configuration: up to 10 requests per 60 seconds
+        // Environment-configurable batch rate limiting
+        const parsedBatchSize = parseInt(process.env.GEMINI_BATCH_SIZE || '', 10);
+        const parsedBatchInterval = parseInt(process.env.GEMINI_BATCH_INTERVAL_MS || '', 70000);
+        const batchSize = Number.isFinite(parsedBatchSize) && parsedBatchSize > 0 ? parsedBatchSize : 10;
+        const batchIntervalMs = Number.isFinite(parsedBatchInterval) && parsedBatchInterval >= 1000 ? parsedBatchInterval : 60000;
+
         this.rateLimit = {
-            maxBatchSize: 10,
-            batchIntervalMs: 60000,
+            maxBatchSize: batchSize,
+            batchIntervalMs: batchIntervalMs,
             queue: [],
             processing: false
+        };
+
+        // Retry configuration
+        const parsedMaxRetries = parseInt(process.env.GEMINI_MAX_RETRIES || '', 4);
+        const parsedRetryBaseMs = parseInt(process.env.GEMINI_RETRY_BASE_MS || '', 1500);
+        this.retryConfig = {
+            maxRetries: Number.isFinite(parsedMaxRetries) && parsedMaxRetries >= 0 ? parsedMaxRetries : 3,
+            baseDelayMs: Number.isFinite(parsedRetryBaseMs) && parsedRetryBaseMs >= 100 ? parsedRetryBaseMs : 1000
+        };
+
+        // Metrics
+        this.metrics = {
+            processedCount: 0,
+            failedCount: 0,
+            retryCount: 0,
+            lastBatchAt: null,
+            lastErrorCode: null,
+            lastErrorAt: null
         };
     }
 
@@ -54,7 +77,13 @@ class GeminiAnalysisService {
             batchIntervalMs: this.rateLimit.batchIntervalMs,
             batchIntervalSeconds: Math.ceil(this.rateLimit.batchIntervalMs / 1000),
             queueLength: this.rateLimit.queue.length,
-            isProcessing: this.rateLimit.processing
+            isProcessing: this.rateLimit.processing,
+            processedCount: this.metrics.processedCount,
+            failedCount: this.metrics.failedCount,
+            retryCount: this.metrics.retryCount,
+            lastBatchAt: this.metrics.lastBatchAt,
+            lastErrorCode: this.metrics.lastErrorCode,
+            lastErrorAt: this.metrics.lastErrorAt
         };
     }
 
@@ -74,13 +103,22 @@ class GeminiAnalysisService {
             const batch = this.rateLimit.queue.splice(0, batchSize);
             
             console.log(`🚀 Processing batch of ${batchSize} Gemini requests...`);
+            this.metrics.lastBatchAt = new Date().toISOString();
             
             // Process batch in parallel
-            const promises = batch.map(async (item) => {
+            const promises = batch.map(async (item, index) => {
                 try {
-                    const result = await this._analyzeTranscriptInternal(item.transcript, item.metadata);
+                    // Optional stagger 100–200ms per item within the batch
+                    const staggerMs = 100 + Math.floor(Math.random() * 100);
+                    await new Promise(r => setTimeout(r, staggerMs * index));
+
+                    const result = await this._analyzeWithRetry(item.transcript, item.metadata);
                     item.resolve(result);
+                    this.metrics.processedCount += 1;
                 } catch (error) {
+                    this.metrics.failedCount += 1;
+                    this.metrics.lastErrorCode = error.code || error.status || error.name || 'UNKNOWN_ERROR';
+                    this.metrics.lastErrorAt = new Date().toISOString();
                     item.reject(error);
                 }
             });
@@ -95,6 +133,48 @@ class GeminiAnalysisService {
         }
         
         this.rateLimit.processing = false;
+    }
+
+    /**
+     * Analyze with retry/backoff for transient errors
+     */
+    async _analyzeWithRetry(transcript, metadata = {}) {
+        let attempt = 0;
+        let lastError;
+        while (attempt <= this.retryConfig.maxRetries) {
+            try {
+                return await this._analyzeTranscriptInternal(transcript, metadata);
+            } catch (error) {
+                const retryable = this._isRetryableError(error);
+                if (!retryable || attempt === this.retryConfig.maxRetries) {
+                    throw error;
+                }
+                this.metrics.retryCount += 1;
+                const delay = this._computeBackoffDelay(attempt);
+                console.warn(`⏱️ Retry ${attempt + 1}/${this.retryConfig.maxRetries} after ${delay}ms due to: ${error.message}`);
+                await new Promise(r => setTimeout(r, delay));
+                attempt += 1;
+                lastError = error;
+            }
+        }
+        throw lastError || new Error('Analysis failed after retries');
+    }
+
+    _computeBackoffDelay(attempt) {
+        const base = this.retryConfig.baseDelayMs;
+        const cap = 30000; // hard cap 30s
+        const expo = Math.min(base * Math.pow(2, attempt), cap);
+        const jitter = Math.floor(Math.random() * Math.min(250, expo));
+        return expo + jitter;
+    }
+
+    _isRetryableError(error) {
+        const message = (error && error.message) || '';
+        const code = (error && (error.code || error.status || error.name)) || '';
+        const retryableCodes = ['429', '503', 'ECONNRESET', 'ETIMEDOUT', 'RESOURCE_EXHAUSTED'];
+        if (retryableCodes.some(c => String(code).includes(c))) return true;
+        const retryablePhrases = ['quota', 'exceeded', 'timeout', 'temporarily unavailable', 'rate limit'];
+        return retryablePhrases.some(p => message.toLowerCase().includes(p));
     }
 
     /**

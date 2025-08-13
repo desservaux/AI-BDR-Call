@@ -521,6 +521,32 @@ class SupabaseDBService {
     }
 
     /**
+     * Get calls that are eligible for analysis but missing booking_analysis
+     * Returns minimal fields needed for backfill enqueuing
+     */
+    async getCallsMissingAnalysis(limit = 500) {
+        try {
+            // Prefer the calls_with_analysis view if available
+            // Select calls where booking fields are null and transcript exists
+            let query = this.client
+                .from('calls_with_analysis')
+                .select('id, elevenlabs_conversation_id, duration_seconds, call_summary_title, message_count')
+                .is('meeting_booked', null)
+                .order('start_time', { ascending: false })
+                .limit(limit);
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            // Only enqueue calls with at least 2 messages
+            return Array.isArray(data) ? data.filter(r => (r.message_count || 0) >= 2) : [];
+        } catch (error) {
+            console.error('Error fetching calls missing analysis:', error.message);
+            return [];
+        }
+    }
+
+    /**
      * Get call by ElevenLabs conversation ID
      * @param {string} conversationId - ElevenLabs conversation ID
      * @returns {Promise<Object|null>} Call record or null if not found
