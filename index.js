@@ -1594,14 +1594,18 @@ async function handleSequenceCallCompletion(conversationId, webhookStatus) {
         }
 
         const successful = (call_result === 'answered');
-        await supabaseDb.updateSequenceEntryAfterCall(sequenceEntry.id, {
-            successful,
-            status: status_raw,
-            duration: durationSecs,
-            conversation_id: conversationId
-        });
-
-        console.log(`✅ Sequence entry updated for ${conversationId}: successful=${successful}, result=${call_result}`);
+        if (successful) {
+            // Mark the sequence entry as completed on confirmed answered outcome
+            await supabaseDb.updateSequenceEntry(sequenceEntry.id, {
+                status: 'completed',
+                next_call_time: null,
+                updated_at: new Date().toISOString()
+            });
+            console.log(`✅ Sequence entry completed for ${conversationId} (answered)`);
+        } else {
+            // Do not modify attempts/schedule here; the caller already scheduled next attempt
+            console.log(`↩️ Sequence entry left active for ${conversationId} (result=${call_result}); next attempt already scheduled`);
+        }
     } catch (error) {
         console.error('❌ Error handling sequence call completion:', error.message);
     }

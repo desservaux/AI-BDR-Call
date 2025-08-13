@@ -31,6 +31,8 @@ Project Status Board
 - [x] 4) Ensure API response includes `alreadyInSequence` in result
 - [ ] 5) Sanity test manual verification (pending user test)
 - [x] 6) Fix upload-to-sequence flooding bug: restrict additions to IDs from the current upload only
+ - [x] 7) Fix CSV/XLSX import coercing `is_primary=false` to true
+ - [x] 8) Fix Supabase testConnection to use head+count instead of selecting non-existent `count` column
 
 Current Status / Progress Tracking
 - Implemented service changes in `services/supabase-db.js`.
@@ -38,6 +40,8 @@ Current Status / Progress Tracking
 - No server code changes required for the bulk endpoint beyond consuming result (already done previously).
 - Implemented fix: `processCSVUpload`/`processXLSXUpload` now aggregate `phone_number_ids` from `processContactRow`.
 - `processCSVUploadToSequence`/`processXLSXUploadToSequence` now pass only those IDs to `addPhoneNumbersToSequence` (removed unfiltered `getPhoneNumbers()` calls).
+ - Fixed `services/supabase-db.js#processContactRow`: `is_primary` now uses nullish coalescing `rowData.is_primary ?? true` to preserve explicit `false` from user input.
+ - Fixed `services/supabase-db.js#testConnection`: replaced `.select('count')` with `.select('*', { count: 'exact', head: true })` to avoid missing column errors and prevent init blocking.
 
 Executor's Feedback or Assistance Requests
 - Do you want the single-add endpoint `POST /api/sequences/:sequenceId/phone-numbers` to explicitly report when the entry already exists (e.g., message change), or keep current behavior?
@@ -50,6 +54,7 @@ Lessons
 - Supabase PostgREST "no rows" error code is `PGRST116` and should be treated as not found rather than failure.
 - Postgres unique violation code `23505` is expected for race conditions; treat as an "exists" outcome, not an error.
  - Avoid broad `getPhoneNumbers()` during scoped operations. Collect and pass explicit IDs from the operation context to prevent unintended bulk actions.
+ - Boolean defaults: use nullish coalescing (`??`) not `||` when you must preserve explicit `false` values from parsed input.
 # ElevenLabs Voice Agent - Production Ready System
 
 ## Background and Motivation
@@ -239,7 +244,8 @@ Focus on critical stability fixes, scheduling accuracy, and API consistency to e
   - Fetches `getConversationDetailsEnhanced` for authoritative `status_raw`, `duration`, and phone number
   - Maps webhook `completed` to `done`; ignores non-final statuses (initiated/in-progress/processing)
   - Computes `call_result` and updates/creates call accordingly (no reliance on legacy `completed`)
-  - Updates sequence entry with `successful = (call_result === 'answered')` and preserves raw status/duration
+  - Updates sequence entry logic: only mark `sequence_entries.status = 'completed'` when `call_result === 'answered'`; otherwise leave entry active. Removed premature completion based on call initiation.
+  - In `services/supabase-db.js#updateSequenceEntryAfterCall`, removed the branch that set `status = 'completed'` when `callResult.successful` to prevent immediate completion on dial initiation. Attempts increment and next_call_time scheduling now happen without completing, unless max attempts reached.
 
 - 2025-08-11: Executor fixed initialization for new sequence entries in `services/supabase-db.js#addPhoneNumberToSequence`:
   - Set `current_attempt: 0` and `next_call_time` at insert time

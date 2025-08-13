@@ -15,13 +15,12 @@ class SupabaseDBService {
      */
     async testConnection() {
         try {
-            const { data, error } = await this.client
+            const { error, count } = await this.client
                 .from('calls')
-                .select('count')
-                .limit(1);
-            
+                .select('*', { count: 'exact', head: true });
+
             if (error) throw error;
-            
+
             console.log('✅ Supabase connection successful');
             return true;
         } catch (error) {
@@ -404,7 +403,7 @@ class SupabaseDBService {
             // Use the new calls_with_analysis view for comprehensive data
             let query = this.client
                 .from('calls_with_analysis')
-                .select('*')
+                .select('*', { count: 'exact' })
                 .order('start_time', { ascending: false })
                 .order('created_at', { ascending: false });
 
@@ -496,64 +495,13 @@ class SupabaseDBService {
             if (error) throw error;
 
             // Node.js sort fallback to ensure proper date ranking
-            const sortedCalls = (calls || []).sort((a, b) => 
+            const sortedCalls = (calls || []).sort((a, b) =>
                 new Date(b.start_time || b.created_at) - new Date(a.start_time || a.created_at)
             );
 
-            // If we have analysis filters, we need to filter by analysis data
-            if (filters.meetingBooked || filters.personInterested || filters.personUpset) {
-                const filteredCalls = [];
-
-                for (const call of sortedCalls) {
-                    try {
-                        const analysis = await this.getBookingAnalysisByCallId(call.id);
-                        
-                        // Apply analysis filters
-                        let includeCall = true;
-                        
-                        if (filters.meetingBooked !== null && filters.meetingBooked !== undefined) {
-                            const meetingBookedBool = filters.meetingBooked === true || filters.meetingBooked === 'true';
-                            // Only include if analysis exists and matches the filter
-                            if (!analysis || analysis.meeting_booked !== meetingBookedBool) {
-                                includeCall = false;
-                            }
-                        }
-                        
-                        if (filters.personInterested !== null && filters.personInterested !== undefined) {
-                            const personInterestedBool = filters.personInterested === true || filters.personInterested === 'true';
-                            // Only include if analysis exists and matches the filter
-                            if (!analysis || analysis.person_interested !== personInterestedBool) {
-                                includeCall = false;
-                            }
-                        }
-                        
-                        if (filters.personUpset !== null && filters.personUpset !== undefined) {
-                            const personUpsetBool = filters.personUpset === true || filters.personUpset === 'true';
-                            // Only include if analysis exists and matches the filter
-                            if (!analysis || analysis.person_very_upset !== personUpsetBool) {
-                                includeCall = false;
-                            }
-                        }
-                        
-                        if (includeCall) {
-                            filteredCalls.push(call);
-                        }
-                    } catch (error) {
-                        console.warn(`Error checking analysis for call ${call.id}:`, error.message);
-                        // If we can't get analysis, exclude the call when analysis filters are applied
-                        // This ensures we only show calls that actually have the requested analysis data
-                    }
-                }
-                
-                return {
-                    calls: filteredCalls,
-                    total: filteredCalls.length
-                };
-            }
-
             return {
                 calls: sortedCalls,
-                total: sortedCalls.length
+                total: typeof count === 'number' ? count : sortedCalls.length
             };
         } catch (error) {
             console.error('Error getting calls with advanced filters:', error.message);
@@ -1790,11 +1738,11 @@ class SupabaseDBService {
             let newStatus = 'active';
             let nextCallTime = null;
 
-            // Determine next status and call time based on call result
-            if (callResult.successful) {
-                // Call was successful, mark as completed
-                newStatus = 'completed';
-            } else if (currentAttempt >= maxAttempts) {
+            // Determine next status and call time based on attempts only.
+            // Do NOT treat `callResult.successful` as final call outcome here, because this
+            // method is invoked immediately after dialing as well as from webhook paths.
+            // Completion should be handled explicitly by the webhook/cleanup flow.
+            if (currentAttempt >= maxAttempts) {
                 // Max attempts reached
                 newStatus = 'max_attempts_reached';
             } else {
@@ -2491,7 +2439,7 @@ class SupabaseDBService {
                 contact_id: contactId,
                 phone_number: normalizedPhone,
                 phone_type: rowData.phone_type || 'mobile',
-                is_primary: rowData.is_primary || true,
+                is_primary: (rowData.is_primary ?? true),
                 do_not_call: rowData.do_not_call || false
             };
 
