@@ -51,6 +51,10 @@ We need to decouple Gemini transcript analysis from the call sync flow so that s
 - [x] Phase 2: Fire-and-forget enqueue in `services/call-sync.js`
 - [x] Phase 3: Retry/backoff, stagger, and metrics in `services/gemini-analysis.js`
 - [x] Status route and backfill route in `index.js`
+ - [x] Supabase DB: add `getAllCalls()` for maintenance scripts
+ - [x] Harden `/make-call` to require env IDs (no baked-in defaults)
+ - [x] Validate request body for `/api/sequences/:id/entries`
+ - [x] Fix `parseInt` radix usage for env parsing in `services/gemini-analysis.js`
 
 ### Executor's Feedback or Assistance Requests
 - Please set environment variables where the server runs:
@@ -66,6 +70,8 @@ We need to decouple Gemini transcript analysis from the call sync flow so that s
 ### Lessons
 - Include info useful for debugging in logs and endpoint outputs.
 - Read files before editing; prefer UPSERT for idempotency on `call_id`.
+ - Avoid hardcoded API IDs in server routes; fail fast when env is missing.
+ - Always pass radix=10 to `parseInt` and validate env-derived numbers.
 
 
 database schema is in supabase-schema.sql
@@ -123,6 +129,7 @@ Environment variables (with defaults):
 - [ ] Sequence Caller: Wire-up in `index.js` and add status endpoint
 - [ ] Sequence Caller: Graceful shutdown on SIGINT/SIGTERM
 - [ ] Sequence Caller: Manual QA (multi-instance, overlapping ticks, config toggles)
+ - [x] Sequence Caller: Pass `name_test` and `weekday` dynamic variables from `services/sequence-manager.js` using sequence timezone
 
 ### Executor's Feedback or Assistance Requests (Additions)
 
@@ -132,3 +139,4 @@ Environment variables (with defaults):
   - `SEQUENCE_CALLER_INTERVAL_MS` to your desired interval between batches (e.g., 60000 for 60s)
   - `SEQUENCE_CALLER_LOCK_SECONDS=120`
 - Confirm how many app instances will run concurrently; DB claim locks are designed to handle multi-instance safety.
+ - Verify in ElevenLabs dashboard or logs that `dynamic_variables` include `name_test` and `weekday` for sequence calls. Weekday is computed in the sequence timezone; `name_test` is null when contact first name is missing.

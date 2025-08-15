@@ -85,7 +85,7 @@ class ElevenLabsService {
                 agent_id: agentId,
                 agent_phone_number_id: agentPhoneNumberId,
                 to_number: toNumber,
-                ...options
+                dynamic_variables : {name_test: "Martin", weekday: "Thursday"}
             };
 
             // The correct endpoint for outbound calls

@@ -22,8 +22,13 @@ class SequenceCallerService {
 
 	updateConfigFromEnv() {
 		const rawEnabled = process.env.SEQUENCE_CALLER_ENABLED;
-		const enabled = String(rawEnabled || '').toLowerCase();
-		this.enabled = enabled === '1' || enabled === 'true' || enabled === 'yes';
+		const normalized = String(rawEnabled === undefined || rawEnabled === null ? '' : rawEnabled).trim().toLowerCase();
+		// Default to enabled when not provided; only disable on explicit false-like values
+		if (normalized === '') {
+			this.enabled = true;
+		} else {
+			this.enabled = !(normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off');
+		}
 		const parsedBatch = parseInt(process.env.SEQUENCE_CALLER_BATCH_SIZE || '10', 10);
 		this.batchSize = Number.isFinite(parsedBatch) && parsedBatch > 0 ? parsedBatch : 10;
 		const parsedInterval = parseInt(process.env.SEQUENCE_CALLER_INTERVAL_MS || '60000', 10);

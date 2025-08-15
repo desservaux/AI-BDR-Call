@@ -1277,6 +1277,18 @@
                         <span class="status-label">Agent</span>
                         <span class="status-value status-unknown" id="agent-status">Checking...</span>
                     </div>
+                    <div class="status-item">
+                        <span class="status-label">Sequence Caller</span>
+                        <span class="status-value status-unknown" id="sequence-caller-status">Checking...</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Sequence Caller Enabled</span>
+                        <span class="status-value status-unknown" id="sequence-caller-enabled">Checking...</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Sequence Caller Last Run</span>
+                        <span class="status-value" id="sequence-caller-last">—</span>
+                    </div>
                 </div>
                 
                 <div class="call-section">
@@ -1863,6 +1875,9 @@
         const serverStatus = document.getElementById('server-status');
         const elevenlabsStatus = document.getElementById('elevenlabs-status');
         const agentStatus = document.getElementById('agent-status');
+        const sequenceCallerStatus = document.getElementById('sequence-caller-status');
+        const sequenceCallerEnabled = document.getElementById('sequence-caller-enabled');
+        const sequenceCallerLast = document.getElementById('sequence-caller-last');
         const callForm = document.getElementById('call-form');
         const callBtn = document.getElementById('call-btn');
         const refreshBtn = document.getElementById('refresh-btn');
@@ -2659,11 +2674,49 @@
                 // Update call button state - only need ElevenLabs for integration
                 callBtn.disabled = !elevenlabs.success;
                 
+                // Check Sequence Caller status
+                try {
+                    const scResponse = await fetch(`${API_BASE}/api/sequence-caller/status`);
+                    const sc = await scResponse.json();
+                    if (sc && sc.success && sc.status) {
+                        const enabled = !!sc.status.enabled;
+                        const isTicking = !!sc.status.isTicking;
+                        const lastTickStartedAt = sc.status.lastTickStartedAt;
+                        const lastTickFinishedAt = sc.status.lastTickFinishedAt;
+                        const statusOk = enabled; // consider enabled as primary signal
+
+                        updateStatus(sequenceCallerStatus, statusOk, isTicking ? 'Running' : (enabled ? 'Idle' : 'Disabled'));
+                        updateStatus(sequenceCallerEnabled, enabled, enabled ? 'true' : 'false');
+
+                        let lastDisplay = '—';
+                        if (lastTickFinishedAt || lastTickStartedAt) {
+                            const ts = lastTickFinishedAt || lastTickStartedAt;
+                            try {
+                                lastDisplay = new Date(ts).toLocaleString();
+                            } catch (_) {
+                                lastDisplay = String(ts);
+                            }
+                        }
+                        sequenceCallerLast.textContent = lastDisplay;
+                    } else {
+                        updateStatus(sequenceCallerStatus, false, 'Unavailable');
+                        updateStatus(sequenceCallerEnabled, false, 'false');
+                        sequenceCallerLast.textContent = '—';
+                    }
+                } catch (e) {
+                    updateStatus(sequenceCallerStatus, false, 'Error');
+                    updateStatus(sequenceCallerEnabled, false, 'false');
+                    sequenceCallerLast.textContent = '—';
+                }
+
             } catch (error) {
                 console.error('Status check failed:', error);
                 updateStatus(serverStatus, false, 'Error');
                 updateStatus(elevenlabsStatus, false, 'Error');
                 updateStatus(agentStatus, false, 'Error');
+                updateStatus(sequenceCallerStatus, false, 'Error');
+                updateStatus(sequenceCallerEnabled, false, 'false');
+                sequenceCallerLast.textContent = '—';
                 callBtn.disabled = true;
             }
         }
@@ -3786,6 +3839,31 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
 
         // ===== SEQUENCE MODAL FUNCTIONS =====
 
+        // Time normalization helpers
+        function toHHMM(time) {
+            if (!time) return '';
+            // Already HH:MM:SS -> trim seconds for <input type="time">
+            if (/^\d{2}:\d{2}:\d{2}$/.test(time)) return time.slice(0, 5);
+            // HH:MM or H:MM -> pad hour
+            if (/^\d{1,2}:\d{2}$/.test(time)) {
+                const [h, m] = time.split(':');
+                return `${h.padStart(2, '0')}:${m}`;
+            }
+            return time;
+        }
+
+        function toHHMMSS(time) {
+            if (!time) return '';
+            // Already HH:MM:SS
+            if (/^\d{2}:\d{2}:\d{2}$/.test(time)) return time;
+            // HH:MM or H:MM -> append seconds
+            if (/^\d{1,2}:\d{2}$/.test(time)) {
+                const [h, m] = time.split(':');
+                return `${h.padStart(2, '0')}:${m}:00`;
+            }
+            return time;
+        }
+
         // Show sequence modal for adding/editing
         function showSequenceModal(sequence = null, mode = 'add') {
             console.log('showSequenceModal called with:', { sequence, mode });
@@ -3815,8 +3893,8 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
                 
                 // Set business hours fields
                 document.getElementById('sequenceTimezone').value = sequence.timezone || 'UTC';
-                document.getElementById('sequenceBusinessHoursStart').value = sequence.business_hours_start || '09:00';
-                document.getElementById('sequenceBusinessHoursEnd').value = sequence.business_hours_end || '17:00';
+                document.getElementById('sequenceBusinessHoursStart').value = toHHMM(sequence.business_hours_start) || '09:00';
+                document.getElementById('sequenceBusinessHoursEnd').value = toHHMM(sequence.business_hours_end) || '17:00';
                 document.getElementById('sequenceExcludeWeekends').checked = sequence.exclude_weekends !== false;
                 
                 // Update business hours preview
@@ -4101,8 +4179,8 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
                         retry_delay_hours: parseInt(document.getElementById('sequenceRetryDelay').value),
                         is_active: document.getElementById('sequenceIsActive').checked,
                         timezone: document.getElementById('sequenceTimezone').value,
-                        business_hours_start: document.getElementById('sequenceBusinessHoursStart').value + ':00',
-                        business_hours_end: document.getElementById('sequenceBusinessHoursEnd').value + ':00',
+                        business_hours_start: toHHMMSS(document.getElementById('sequenceBusinessHoursStart').value),
+                        business_hours_end: toHHMMSS(document.getElementById('sequenceBusinessHoursEnd').value),
                         exclude_weekends: document.getElementById('sequenceExcludeWeekends').checked
                     };
                     
@@ -4184,8 +4262,8 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
                     },
                     body: JSON.stringify({
                         timezone,
-                        business_hours_start: startTime + ':00',
-                        business_hours_end: endTime + ':00',
+                        business_hours_start: toHHMMSS(startTime),
+                        business_hours_end: toHHMMSS(endTime),
                         exclude_weekends: excludeWeekends
                     })
                 });

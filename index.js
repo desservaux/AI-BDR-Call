@@ -104,13 +104,17 @@ app.post('/make-call', async (req, res) => {
         const agentId = process.env.ELEVENLABS_AGENT_ID || 'agent_01jzr5hv9eefkbmnyz8y6smw19';
         const agentPhoneNumberId = process.env.ELEVENLABS_PHONE_NUMBER_ID || 'phnum_0101k1tg02tkf5paw24vvbtwrmr2';
 
-        // Make call via ElevenLabs API
+        // Make call via ElevenLabs API with simplified dynamic_variables
         const result = await elevenLabsService.makeOutboundCall(
             agentId,
             agentPhoneNumberId,
             phoneNumber,
             {
-                message: message || 'Hello! This is your AI assistant calling via ElevenLabs.'
+                message: message || 'Hello! This is your AI assistant calling via ElevenLabs.',
+                dynamic_variables: {
+                    name_test: "Martin",
+                    weekday: "Thursday"
+                }
             }
         );
 

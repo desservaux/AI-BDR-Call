@@ -358,6 +358,33 @@ class SupabaseDBService {
     }
 
     /**
+     * Get all calls (optionally limited)
+     * @param {number|null} limit - Optional limit on number of rows
+     * @returns {Promise<Array>} Array of calls
+     */
+    async getAllCalls(limit = null) {
+        try {
+            let query = this.client
+                .from('calls')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (limit && Number.isFinite(limit)) {
+                query = query.limit(limit);
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+
+            return data || [];
+        } catch (error) {
+            console.error('Error getting all calls:', error.message);
+            throw new Error(`Failed to get all calls: ${error.message}`);
+        }
+    }
+
+    /**
      * Get calls with advanced filtering including analysis data
      * @param {Object} filters - Advanced filter options
      * @returns {Promise<Array>} Array of calls with analysis data

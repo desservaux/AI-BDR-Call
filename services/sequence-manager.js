@@ -111,12 +111,29 @@ class SequenceManagerService {
                     if (!agentId || !agentPhoneNumberId) {
                         throw new Error('Missing ELEVENLABS_AGENT_ID or ELEVENLABS_PHONE_NUMBER_ID environment variables');
                     }
-                    const callResult = await elevenLabsService.makeOutboundCall(
-                        agentId,
-                        agentPhoneNumberId,
-                        phoneNumber,
-                        { message: 'Hello! This is your AI assistant calling via ElevenLabs.' }
-                    );
+					// Compute personalization variables
+					const tz = entry.sequences?.timezone || 'UTC';
+					const firstName = (entry.phone_numbers?.contacts?.first_name || '').trim() || null;
+					const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: tz }).format(new Date());
+
+					// Optional personalized message
+					const personalizedMessage = firstName
+						? `Hi ${firstName}, this is your AI assistant calling via ElevenLabs.`
+						: 'Hello! This is your AI assistant calling via ElevenLabs.';
+
+					const callResult = await elevenLabsService.makeOutboundCall(
+						agentId,
+						agentPhoneNumberId,
+						phoneNumber,
+						{
+							message: personalizedMessage,
+							dynamic_variables: {
+								name_test: firstName,
+								weekday: weekday
+							},
+							source_info: { source: 'sequence-caller', sequence_id: entry.sequences.id, sequence_entry_id: entry.id }
+						}
+					);
                     
                     if (callResult.success) {
                         results.calls_initiated++;

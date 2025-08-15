@@ -9,7 +9,7 @@ class GeminiAnalysisService {
         
         // Environment-configurable batch rate limiting
         const parsedBatchSize = parseInt(process.env.GEMINI_BATCH_SIZE || '', 10);
-        const parsedBatchInterval = parseInt(process.env.GEMINI_BATCH_INTERVAL_MS || '', 70000);
+        const parsedBatchInterval = parseInt(process.env.GEMINI_BATCH_INTERVAL_MS || '', 10);
         const batchSize = Number.isFinite(parsedBatchSize) && parsedBatchSize > 0 ? parsedBatchSize : 10;
         const batchIntervalMs = Number.isFinite(parsedBatchInterval) && parsedBatchInterval >= 1000 ? parsedBatchInterval : 60000;
 
@@ -21,8 +21,8 @@ class GeminiAnalysisService {
         };
 
         // Retry configuration
-        const parsedMaxRetries = parseInt(process.env.GEMINI_MAX_RETRIES || '', 4);
-        const parsedRetryBaseMs = parseInt(process.env.GEMINI_RETRY_BASE_MS || '', 1500);
+        const parsedMaxRetries = parseInt(process.env.GEMINI_MAX_RETRIES || '', 10);
+        const parsedRetryBaseMs = parseInt(process.env.GEMINI_RETRY_BASE_MS || '', 10);
         this.retryConfig = {
             maxRetries: Number.isFinite(parsedMaxRetries) && parsedMaxRetries >= 0 ? parsedMaxRetries : 3,
             baseDelayMs: Number.isFinite(parsedRetryBaseMs) && parsedRetryBaseMs >= 100 ? parsedRetryBaseMs : 1000
