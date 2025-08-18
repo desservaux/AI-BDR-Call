@@ -15,6 +15,7 @@ const callSync = require('./services/call-sync'); // Call sync service (already 
 const SupabaseDBService = require('./services/supabase-db'); // Database service
 const geminiAnalysisService = require('./services/gemini-analysis');
 const sequenceCaller = require('./services/sequence-caller');
+const sequenceBatchCaller = require('./services/sequence-batch-caller');
 
 // Initialize services
 const supabaseDb = new SupabaseDBService();
@@ -384,6 +385,15 @@ app.get('/api/sequence-caller/status', async (req, res) => {
     } catch (error) {
         console.error('❌ Error getting Sequence Caller status:', error.message);
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Batch caller status endpoint
+app.get('/api/sequence-batch-caller/status', (req, res) => {
+    try {
+        res.json({ success: true, status: sequenceBatchCaller.getStatus() });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
     }
 });
 
@@ -1718,21 +1728,33 @@ app.listen(PORT, () => {
     // Initialize services after server starts
     initializeServices();
 
-    // Start sequence caller if enabled
+    // Start legacy per-number caller if explicitly enabled
     try {
         sequenceCaller.start();
     } catch (e) {
         console.error('❌ Failed to start Sequence Caller:', e.message);
+    }
+
+    // Start batch caller (enabled by default)
+    try {
+        sequenceBatchCaller.start();
+    } catch (e) {
+        console.error('❌ Failed to start Sequence Batch Caller:', e.message);
     }
 });
 
 // Graceful shutdown
 async function shutdown() {
     try {
-        await sequenceCaller.stop();
+        await sequenceBatchCaller.stop();
     } catch (e) {
         // ignore
     } finally {
+        try {
+            await sequenceCaller.stop();
+        } catch (e2) {
+            // ignore
+        }
         process.exit(0);
     }
 }

@@ -85,7 +85,7 @@ class ElevenLabsService {
                 agent_id: agentId,
                 agent_phone_number_id: agentPhoneNumberId,
                 to_number: toNumber,
-                dynamic_variables : {name_test: "Martin", weekday: "Thursday"}
+                ...options
             };
 
             // The correct endpoint for outbound calls
@@ -105,6 +105,57 @@ class ElevenLabsService {
         } catch (error) {
             console.error('❌ Error making ElevenLabs outbound call:', error.response?.data || error.message);
             throw new Error(`Failed to make outbound call: ${error.response?.data?.detail || error.message}`);
+        }
+    }
+
+    /**
+     * Submit a batch calling job to ElevenLabs
+     * @param {Object} params
+     * @param {string} params.call_name - Friendly name for the job
+     * @param {string} params.agent_id - ElevenLabs agent ID
+     * @param {string} params.agent_phone_number_id - ElevenLabs phone number ID
+     * @param {number|null} [params.scheduled_time_unix] - Unix seconds to schedule, or null for immediate
+     * @param {Array<{phone_number: string}>} params.recipients - List of recipients
+     * @returns {Promise<{success: boolean, job?: Object, error?: string}>}
+     */
+    async submitBatchCalling({ call_name, agent_id, agent_phone_number_id, scheduled_time_unix = null, recipients }) {
+        try {
+            if (!Array.isArray(recipients) || recipients.length === 0) {
+                throw new Error('recipients is required and must be a non-empty array');
+            }
+
+            const cleanedRecipients = recipients.map(r => {
+                const base = { phone_number: r.phone_number };
+                if (r.id) base.id = r.id;
+                if (r.conversation_initiation_client_data) {
+                    base.conversation_initiation_client_data = r.conversation_initiation_client_data;
+                }
+                if (r.conversation_config_override) {
+                    base.conversation_config_override = r.conversation_config_override;
+                }
+                if (r.custom_llm_extra_body) {
+                    base.custom_llm_extra_body = r.custom_llm_extra_body;
+                }
+                if (r.user_id) base.user_id = r.user_id;
+                if (r.source_info) base.source_info = r.source_info;
+                if (r.dynamic_variables) base.dynamic_variables = r.dynamic_variables;
+                return base;
+            });
+
+            const payload = {
+                call_name,
+                agent_id,
+                agent_phone_number_id,
+                scheduled_time_unix,
+                recipients: cleanedRecipients
+            };
+
+            const res = await this.client.post('/convai/batch-calling/submit', payload);
+            return { success: true, job: res.data };
+        } catch (err) {
+            const msg = err.response?.data?.detail || err.response?.data || err.message;
+            console.error('Batch calling submit failed:', msg);
+            return { success: false, error: msg };
         }
     }
 
