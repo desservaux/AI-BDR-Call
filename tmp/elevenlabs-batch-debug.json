@@ -1,0 +1,11 @@
+{
+  "statusCode": 403,
+  "message": "{\"status\":\"batch_calling_agreement_required\",\"message\":\"Please accept the batch calling Terms & Conditions in the application to use this feature.\"}",
+  "response": {
+    "detail": {
+      "status": "batch_calling_agreement_required",
+      "message": "Please accept the batch calling Terms & Conditions in the application to use this feature."
+    }
+  },
+  "rawBody": "{\"detail\":{\"status\":\"batch_calling_agreement_required\",\"message\":\"Please accept the batch calling Terms & Conditions in the application to use this feature.\"}}"
+}

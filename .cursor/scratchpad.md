@@ -140,3 +140,32 @@ Environment variables (with defaults):
   - `SEQUENCE_CALLER_LOCK_SECONDS=120`
 - Confirm how many app instances will run concurrently; DB claim locks are designed to handle multi-instance safety.
  - Verify in ElevenLabs dashboard or logs that `dynamic_variables` include `name_test` and `weekday` for sequence calls. Weekday is computed in the sequence timezone; `name_test` is null when contact first name is missing.
+
+### Project Status Board (Batch Calling Switch)
+
+- [x] Disable individual per-number caller by default (`SEQUENCE_CALLER_ENABLED` now defaults to false)
+- [x] Keep batch caller enabled by default (`BATCH_CALLING_ENABLED=true` default preserved)
+- [x] Reduce batch tick default from 1h to 2 min (`BATCH_CALLING_INTERVAL_MS` default 120000)
+- [x] Implement draining loop in `services/sequence-batch-caller.js` to submit multiple jobs per tick
+- [x] Add `BATCH_CALLING_MAX_JOBS_PER_TICK` (default 5) guard to cap jobs per tick
+- [x] Expose `maxJobsPerTick` in `/api/sequence-batch-caller/status`
+
+### Decommission Legacy Sequence Caller
+
+- [x] Remove `services/sequence-caller.js`
+- [x] Remove import, startup, stop hooks, and status endpoint from `index.js`
+- [x] Remove Sequence Caller status UI and JS from `public/index.html`
+- [x] Update any `source_info` references to `sequence-batch` where applicable
+
+### Executor's Feedback or Assistance Requests (Batch Calling Switch)
+
+- Please ensure envs (only if you override defaults):
+  - `SEQUENCE_CALLER_ENABLED=false` (now the default; set explicitly if previously true)
+  - `BATCH_CALLING_ENABLED=true` (default)
+  - `BATCH_CALLING_INTERVAL_MS=120000` (2 minutes)
+  - `BATCH_CALLING_MAX_RECIPIENTS=50` (API max per job; default enforced)
+  - `BATCH_CALLING_MAX_JOBS_PER_TICK=5` (optional; increases/decreases throughput)
+- Manual QA:
+  - GET `/api/sequence-batch-caller/status` → `enabled=true`, `intervalMs≈120000`, `maxJobsPerTick=5`.
+  - Load >50 ready entries; observe multiple batch submissions per tick until capped by `maxJobsPerTick`.
+  - Confirm sequence entries are advanced immediately after submission.

@@ -14,7 +14,6 @@ const elevenLabsService = require('./services/elevenlabs'); // ElevenLabs integr
 const callSync = require('./services/call-sync'); // Call sync service (already instantiated)
 const SupabaseDBService = require('./services/supabase-db'); // Database service
 const geminiAnalysisService = require('./services/gemini-analysis');
-const sequenceCaller = require('./services/sequence-caller');
 const sequenceBatchCaller = require('./services/sequence-batch-caller');
 
 // Initialize services
@@ -377,16 +376,7 @@ app.get('/api/gemini/status', async (req, res) => {
     }
 });
 
-// Sequence caller status
-app.get('/api/sequence-caller/status', async (req, res) => {
-    try {
-        const status = sequenceCaller.getStatus();
-        res.json({ success: true, status });
-    } catch (error) {
-        console.error('❌ Error getting Sequence Caller status:', error.message);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
+// (Removed) Sequence caller status endpoint
 
 // Batch caller status endpoint
 app.get('/api/sequence-batch-caller/status', (req, res) => {
@@ -1728,14 +1718,9 @@ app.listen(PORT, () => {
     // Initialize services after server starts
     initializeServices();
 
-    // Start legacy per-number caller if explicitly enabled
-    try {
-        sequenceCaller.start();
-    } catch (e) {
-        console.error('❌ Failed to start Sequence Caller:', e.message);
-    }
+    // (Removed) Legacy per-number caller startup
 
-    // Start batch caller (enabled by default)
+    // Start batch caller (enabled by default, now default interval 2 min)
     try {
         sequenceBatchCaller.start();
     } catch (e) {
@@ -1750,11 +1735,6 @@ async function shutdown() {
     } catch (e) {
         // ignore
     } finally {
-        try {
-            await sequenceCaller.stop();
-        } catch (e2) {
-            // ignore
-        }
         process.exit(0);
     }
 }

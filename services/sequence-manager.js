@@ -131,7 +131,7 @@ class SequenceManagerService {
 								name_test: firstName,
 								weekday: weekday
 							},
-							source_info: { source: 'sequence-caller', sequence_id: entry.sequences.id, sequence_entry_id: entry.id }
+							source_info: { source: 'sequence-batch', sequence_id: entry.sequences.id, sequence_entry_id: entry.id }
 						}
 					);
                     
