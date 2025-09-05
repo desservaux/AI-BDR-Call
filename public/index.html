@@ -780,7 +780,261 @@
             font-size: 0.8rem;
             border-radius: 6px;
         }
-        
+
+        /* Agent Assignment Styles */
+        .agent-assignment-section {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 15px;
+        }
+
+        .assignment-header h4 {
+            margin: 0 0 5px 0;
+            color: #495057;
+        }
+
+        .assignment-header p {
+            margin: 0 0 15px 0;
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .assignment-mode {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .assignment-mode label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+
+        .assignment-mode-content {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+
+        .weight-input {
+            width: 80px;
+            margin-left: 10px;
+        }
+
+        .agent-item {
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: white;
+        }
+
+        .agent-item .form-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .agent-item label {
+            min-width: 60px;
+            margin-bottom: 0;
+        }
+
+        /* Sequence Tabs Styles */
+        .sequence-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .sequence-tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: #f8f9fa;
+            color: #6c757d;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .sequence-tab-btn:hover {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .sequence-tab-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .sequence-tab-content {
+            display: none;
+        }
+
+        .sequence-tab-content.active {
+            display: block;
+        }
+
+        /* Beta Test Section Styles */
+        .beta-test-section {
+            padding: 20px 0;
+        }
+
+        .beta-test-header h4 {
+            margin: 0 0 5px 0;
+            color: #495057;
+        }
+
+        .beta-test-header p {
+            margin: 0 0 20px 0;
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .date-filters {
+            display: flex;
+            gap: 15px;
+            align-items: end;
+            margin-bottom: 20px;
+        }
+
+        .date-filters .form-group {
+            margin-bottom: 0;
+        }
+
+        .date-filters .form-input {
+            width: 150px;
+        }
+
+        .beta-metrics-table {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            overflow: hidden;
+        }
+
+        .beta-metrics-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
+            gap: 15px;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .beta-metrics-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
+            gap: 15px;
+            padding: 15px 20px;
+            border-bottom: 1px solid #f1f3f4;
+            align-items: center;
+        }
+
+        .beta-metrics-row:last-child {
+            border-bottom: none;
+        }
+
+        .beta-metrics-row:hover {
+            background: #f8f9fa;
+        }
+
+        .agent-name {
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .metric-value {
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .metric-value.positive {
+            color: #28a745;
+        }
+
+        .metric-value.neutral {
+            color: #6c757d;
+        }
+
+        .metric-value.negative {
+            color: #dc3545;
+        }
+
+        /* Agent Configuration Section Styles */
+        .agent-config-section {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .agent-config-section h4 {
+            margin: 0 0 5px 0;
+            color: #495057;
+        }
+
+        .section-description {
+            margin: 0 0 15px 0;
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .sequence-agent-item {
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: white;
+        }
+
+        .sequence-agent-item .form-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sequence-agent-item label {
+            min-width: 60px;
+            margin-bottom: 0;
+        }
+
         .loading {
             text-align: center;
             padding: 40px;
@@ -792,6 +1046,107 @@
             padding: 40px;
             color: #666;
             font-style: italic;
+        }
+
+        /* Settings Tab Styles */
+        .settings-content {
+            max-width: 800px;
+        }
+
+        .settings-section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border: 1px solid #e1e5e9;
+        }
+
+        .settings-section h3 {
+            margin: 0 0 8px 0;
+            color: #333;
+            font-size: 1.3em;
+        }
+
+        .settings-description {
+            color: #6c757d;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .phone-pool-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .current-pool h4,
+        .add-phone-section h4 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 1.1em;
+        }
+
+        .phone-pool-list {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 100px;
+        }
+
+        .phone-pool-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .phone-pool-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .phone-id {
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .remove-phone {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .remove-phone:hover {
+            background: #c82333;
+        }
+
+        .add-phone-section .form-group {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .add-phone-section .form-input {
+            flex: 1;
+        }
+
+        .add-phone-section .btn {
+            white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+            .phone-pool-section {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
         }
 
         /* Contacts and Sequences Table Styles */
@@ -819,6 +1174,18 @@
             font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            align-items: center;
+        }
+
+        .table-header-cell {
+            display: flex;
+            align-items: center;
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            min-height: 24px;
         }
         
         .contacts-table-header {
@@ -851,6 +1218,15 @@
             align-items: center;
             transition: all 0.2s ease;
             font-size: 0.95rem;
+        }
+
+        /* Ensure all data cells have consistent alignment */
+        .contact-row > div,
+        .sequence-row > div,
+        .phone-number-row > div {
+            display: flex;
+            align-items: center;
+            min-height: 24px;
         }
         
         .contact-row {
@@ -922,11 +1298,15 @@
         
         .contact-status,
         .sequence-status {
-            padding: 4px 8px;
+            padding: 2px 6px;
             border-radius: 12px;
             font-size: 0.8em;
             font-weight: 600;
             text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 20px;
         }
         
         
@@ -935,6 +1315,8 @@
         .sequence-actions {
             display: flex;
             gap: 5px;
+            align-items: center;
+            justify-content: flex-start;
         }
         
         .btn-edit {
@@ -978,6 +1360,9 @@
         .sequence-entries {
             color: #007bff;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         /* Sequence Management Styles */
@@ -1246,6 +1631,10 @@
                     <span class="icon">📱</span>
                     Phone Numbers
                 </a>
+                <a href="#" class="tabbar-link" data-tab="settings">
+                    <span class="icon">⚙️</span>
+                    Settings
+                </a>
                 <a href="#" class="tabbar-link" data-tab="analytics">
                     <span class="icon">📊</span>
                     Analytics
@@ -1277,7 +1666,26 @@
                         <span class="status-label">Agent</span>
                         <span class="status-value status-unknown" id="agent-status">Checking...</span>
                     </div>
-                    <!-- Legacy Sequence Caller status removed -->
+                    <div class="status-item">
+                        <span class="status-label">ELEVENLABS_API_KEY</span>
+                        <span class="status-value status-unknown" id="api-key-status">Checking...</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">ELEVENLABS_AGENT_ID</span>
+                        <span class="status-value status-unknown" id="agent-id-status">Checking...</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">ELEVENLABS_PHONE_NUMBER_ID</span>
+                        <span class="status-value status-unknown" id="phone-id-status">Checking...</span>
+                    </div>
+                <div class="status-item">
+                    <span class="status-label">Batch Caller</span>
+                    <span class="status-value status-unknown" id="batch-caller-status">Checking...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Batch Caller Details</span>
+                    <span class="status-value status-unknown" id="batch-caller-details">Checking...</span>
+                </div>
                 </div>
                 
                 <div class="call-section">
@@ -1431,6 +1839,63 @@
                         <button class="btn btn-secondary" id="prev-page-btn">← Previous</button>
                         <div class="page-numbers" id="page-numbers"></div>
                         <button class="btn btn-secondary" id="next-page-btn">Next →</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div class="dashboard-content" id="settings-tab">
+                <div class="dashboard-header">
+                    <h2 class="dashboard-title">⚙️ Settings</h2>
+                    <div class="dashboard-actions">
+                        <button class="btn btn-secondary" id="save-settings-btn">💾 Save Settings</button>
+                        <button class="btn btn-secondary" id="refresh-settings-btn">🔄 Refresh</button>
+                    </div>
+                </div>
+
+                <div class="settings-content">
+                    <!-- Phone Pool Configuration -->
+                    <div class="settings-section">
+                        <h3>📱 Phone Number Pool</h3>
+                        <p class="settings-description">
+                            Configure phone numbers for randomization to avoid spam filters.
+                            Each call will randomly select from this pool.
+                        </p>
+
+                        <div class="phone-pool-section">
+                            <div class="current-pool">
+                                <h4>Current Phone Pool:</h4>
+                                <div id="current-phone-pool" class="phone-pool-list">
+                                    <div class="loading">Loading phone pool...</div>
+                                </div>
+                            </div>
+
+                            <div class="add-phone-section">
+                                <h4>Add Phone Number:</h4>
+                                <div class="form-group">
+                                    <input type="text" id="new-phone-id" placeholder="e.g., phnum_001" class="form-input">
+                                    <button type="button" id="add-phone-btn" class="btn btn-primary">➕ Add Phone</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Other Settings Sections (placeholder) -->
+                    <div class="settings-section">
+                        <h3>🎯 Agent Configuration</h3>
+                        <p class="settings-description">
+                            Default agent settings (display only). Sequence-level settings override these.
+                        </p>
+
+                        <div class="form-group">
+                            <label for="default-agent-id">Default Agent ID:</label>
+                            <input type="text" id="default-agent-id" placeholder="e.g., agent_default" class="form-input">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="default-agent-phone">Default Phone ID:</label>
+                            <input type="text" id="default-agent-phone" placeholder="e.g., phnum_default" class="form-input">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1642,7 +2107,7 @@
                 <div class="dashboard-header">
                     <h2 class="dashboard-title">📱 Phone Numbers Management</h2>
                     <div class="dashboard-actions">
-                        <button class="btn btn-primary" id="add-phone-btn">
+                        <button class="btn btn-primary" id="add-phone-number-btn">
                             ➕ Add Phone Number
                         </button>
                         <button class="btn btn-secondary" id="refresh-phone-numbers-btn">
@@ -1780,7 +2245,57 @@
                         <div id="businessHoursValidation" class="validation-message"></div>
                     </div>
                 </div>
-                
+
+                <!-- Agent Assignment Configuration -->
+                <div class="agent-config-section">
+                    <h4>🤖 Agent Assignment Configuration (Beta Testing)</h4>
+                    <p class="section-description">Configure how agents are automatically assigned when phone numbers are added to this sequence.</p>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableAgentConfig">
+                            Enable Agent Assignment
+                        </label>
+                    </div>
+
+                    <div id="agentConfigContainer" style="display: none;">
+                        <div class="assignment-mode">
+                            <label><input type="radio" name="sequenceAssignmentMode" value="single" checked> Single Agent</label>
+                            <label><input type="radio" name="sequenceAssignmentMode" value="distribute"> Distribute Agents</label>
+                        </div>
+
+                        <!-- Single Agent Mode -->
+                        <div id="sequenceSingleAgentMode" class="assignment-mode-content">
+                            <div class="form-group">
+                                <label for="sequenceSingleAgentId">Agent ID: *</label>
+                                <input type="text" id="sequenceSingleAgentId" placeholder="e.g., agent_01jzr5hv9eefkbmnyz8y6smw19" class="form-input" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="sequenceSingleAgentPhone">Phone Number ID: (Optional)</label>
+                                <input type="text" id="sequenceSingleAgentPhone" placeholder="e.g., phnum_0101k1tg02tkf5paw24vvbtwrmr2 (leave empty to use global pool)" class="form-input">
+                                <small style="color: #6c757d; font-size: 12px;">Leave empty to use random phone from global pool</small>
+                            </div>
+                        </div>
+
+                        <!-- Distribute Agents Mode -->
+                        <div id="sequenceDistributeAgentsMode" class="assignment-mode-content" style="display: none;">
+                            <div class="sequence-agent-list" id="sequenceAgentList">
+                                <div class="sequence-agent-item">
+                                    <div class="form-group">
+                                        <label>Agent 1</label>
+                                        <input type="text" class="sequence-agent-id" placeholder="Agent ID *" class="form-input" required>
+                                        <input type="text" class="sequence-agent-phone" placeholder="Phone ID (optional)" class="form-input">
+                                        <input type="number" class="sequence-agent-weight" placeholder="Weight" value="1" min="1" class="form-input weight-input">
+                                        <button type="button" class="btn btn-small btn-danger remove-sequence-agent">Remove</button>
+                                    </div>
+                                    <small style="color: #6c757d; font-size: 12px; display: block; margin-top: 5px;">Leave phone ID empty to use random phone from global pool</small>
+                                </div>
+                            </div>
+                            <button type="button" id="addSequenceAgentBtn" class="btn btn-secondary">➕ Add Agent</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Save Sequence</button>
                     <button type="button" class="btn btn-secondary" onclick="closeSequenceModal()">Cancel</button>
@@ -1798,28 +2313,70 @@
             <span class="close" onclick="closeSequenceDetailsModal()">&times;</span>
         </div>
         <div class="modal-body" id="sequenceDetailsContent">
-            <div class="sequence-stats">
-                <div class="stat-item">
-                    <span class="stat-label">Total Entries:</span>
-                    <span class="stat-value" id="sequenceTotalEntries">0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Active:</span>
-                    <span class="stat-value" id="sequenceActiveEntries">0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Completed:</span>
-                    <span class="stat-value" id="sequenceCompletedEntries">0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Max Attempts:</span>
-                    <span class="stat-value" id="sequenceMaxAttempts">3</span>
+            <!-- Sequence Details Tabs -->
+            <div class="sequence-tabs">
+                <button class="sequence-tab-btn active" data-tab="overview">Overview</button>
+                <button class="sequence-tab-btn" data-tab="entries">Entries</button>
+                <button class="sequence-tab-btn" data-tab="beta-test">Beta Test</button>
+            </div>
+
+            <!-- Overview Tab -->
+            <div class="sequence-tab-content active" id="overview-tab">
+                <div class="sequence-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Entries:</span>
+                        <span class="stat-value" id="sequenceTotalEntries">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Active:</span>
+                        <span class="stat-value" id="sequenceActiveEntries">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Completed:</span>
+                        <span class="stat-value" id="sequenceCompletedEntries">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Max Attempts:</span>
+                        <span class="stat-value" id="sequenceMaxAttempts">3</span>
+                    </div>
                 </div>
             </div>
-            <div class="sequence-entries">
-                <h4>Sequence Entries</h4>
-                <div class="entries-table" id="sequenceEntriesTable">
-                    <div class="loading">Loading entries...</div>
+
+            <!-- Entries Tab -->
+            <div class="sequence-tab-content" id="entries-tab">
+                <div class="sequence-entries">
+                    <h4>Sequence Entries</h4>
+                    <div class="entries-table" id="sequenceEntriesTable">
+                        <div class="loading">Loading entries...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Beta Test Tab -->
+            <div class="sequence-tab-content" id="beta-test-tab">
+                <div class="beta-test-section">
+                    <div class="beta-test-header">
+                        <h4>🤖 Agent Performance Comparison</h4>
+                        <p>Compare metrics across different agents assigned to this sequence</p>
+                    </div>
+
+                    <!-- Date Filters -->
+                    <div class="date-filters">
+                        <div class="form-group">
+                            <label for="beta-from-date">From:</label>
+                            <input type="date" id="beta-from-date" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="beta-to-date">To:</label>
+                            <input type="date" id="beta-to-date" class="form-input">
+                        </div>
+                        <button type="button" id="refresh-beta-metrics" class="btn btn-secondary">🔄 Refresh</button>
+                    </div>
+
+                    <!-- Metrics Table -->
+                    <div class="beta-metrics-table" id="beta-metrics-table">
+                        <div class="loading">Loading agent metrics...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1864,6 +2421,11 @@
         const serverStatus = document.getElementById('server-status');
         const elevenlabsStatus = document.getElementById('elevenlabs-status');
         const agentStatus = document.getElementById('agent-status');
+        const apiKeyStatus = document.getElementById('api-key-status');
+        const agentIdStatus = document.getElementById('agent-id-status');
+        const phoneIdStatus = document.getElementById('phone-id-status');
+        const batchCallerStatus = document.getElementById('batch-caller-status');
+        const batchCallerDetails = document.getElementById('batch-caller-details');
         // Legacy Sequence Caller DOM elements removed
         const callForm = document.getElementById('call-form');
         const callBtn = document.getElementById('call-btn');
@@ -2658,6 +3220,39 @@
                 const agent = await agentResponse.json();
                 updateStatus(agentStatus, agent.success, agent.success ? 'Ready' : 'Not Available');
                 
+                // Check environment variables status
+                const envResponse = await fetch(`${API_BASE}/env-status`);
+                const env = await envResponse.json();
+                updateStatus(apiKeyStatus, env.elevenlabsApiKey, env.elevenlabsApiKey ? 'Set' : 'Missing');
+                updateStatus(agentIdStatus, env.elevenlabsAgentId, env.elevenlabsAgentId ? 'Set' : 'Missing');
+                updateStatus(phoneIdStatus, env.elevenlabsPhoneNumberId, env.elevenlabsPhoneNumberId ? 'Set' : 'Missing');
+                
+                // Check batch caller status
+                const batchCallerResponse = await fetch(`${API_BASE}/api/sequence-batch-caller/status`);
+                const batchCaller = await batchCallerResponse.json();
+                if (batchCaller.success) {
+                    const status = batchCaller.status;
+                    const isEnabled = status.enabled;
+                    const isRunning = status.isTicking;
+                    // Batch caller is healthy if enabled (regardless of current tick status)
+                    // isTicking is only true during brief tick execution
+                    const statusText = isEnabled ? 'Active' : 'Disabled';
+                    const isHealthy = isEnabled;
+                    updateStatus(batchCallerStatus, isHealthy, statusText);
+                    
+                    // Show additional details
+                    if (isEnabled) {
+                        const intervalMinutes = Math.round(status.intervalMs / 60000);
+                        const detailsText = `Every ${intervalMinutes}min, Max ${status.maxJobsPerTick} jobs`;
+                        updateStatus(batchCallerDetails, true, detailsText);
+                    } else {
+                        updateStatus(batchCallerDetails, false, 'Disabled');
+                    }
+                } else {
+                    updateStatus(batchCallerStatus, false, 'Error');
+                    updateStatus(batchCallerDetails, false, 'Error');
+                }
+                
                 // Update call button state - only need ElevenLabs for integration
                 callBtn.disabled = !elevenlabs.success;
                 
@@ -2668,6 +3263,11 @@
                 updateStatus(serverStatus, false, 'Error');
                 updateStatus(elevenlabsStatus, false, 'Error');
                 updateStatus(agentStatus, false, 'Error');
+                updateStatus(apiKeyStatus, false, 'Error');
+                updateStatus(agentIdStatus, false, 'Error');
+                updateStatus(phoneIdStatus, false, 'Error');
+                updateStatus(batchCallerStatus, false, 'Error');
+                updateStatus(batchCallerDetails, false, 'Error');
                 // Legacy Sequence Caller status elements removed
                 callBtn.disabled = true;
             }
@@ -3359,10 +3959,19 @@
         // Update sequence entry counts
         function updateSequenceEntryCounts(stats) {
             const entryCounts = document.querySelectorAll('.sequence-entries-count');
-            entryCounts.forEach((countElement, index) => {
-                // For now, just show total entries
-                // In a real implementation, you'd match by sequence ID
-                countElement.textContent = stats.total_entries || 0;
+            entryCounts.forEach((countElement) => {
+                // Find the sequence name from the parent element
+                const sequenceRow = countElement.closest('.sequence-row');
+                const sequenceNameElement = sequenceRow.querySelector('.sequence-name');
+                const sequenceName = sequenceNameElement ? sequenceNameElement.textContent.trim() : '';
+
+                // Get the count for this specific sequence from stats.sequences
+                let count = 0;
+                if (stats.sequences && stats.sequences[sequenceName]) {
+                    count = stats.sequences[sequenceName].total || 0;
+                }
+
+                countElement.textContent = count;
             });
         }
 
@@ -3658,24 +4267,65 @@
         // Handle sequence checkbox change
         function handleSequenceCheckboxChange(event) {
             const sequenceSelect = document.getElementById('sequence-select');
-            sequenceSelect.style.display = event.target.checked ? 'block' : 'none';
+            const sequenceInfo = document.getElementById('sequence-info');
+
+            if (event.target.checked) {
+                sequenceSelect.style.display = 'block';
+                sequenceInfo.style.display = 'block';
+            } else {
+                sequenceSelect.style.display = 'none';
+                sequenceInfo.style.display = 'none';
+            }
         }
+
+
 
         // Load sequences for upload dropdown
         async function loadSequencesForUpload() {
             try {
                 const response = await fetch(`${API_BASE}/api/sequences`);
                 const data = await response.json();
-                
+
                 if (data.success) {
                     const sequenceSelect = document.getElementById('sequence-select');
                     sequenceSelect.innerHTML = '<option value="">Select a sequence...</option>';
                     data.sequences.forEach(sequence => {
-                        sequenceSelect.innerHTML += `<option value="${sequence.id}">${sequence.name}</option>`;
+                        const option = document.createElement('option');
+                        option.value = sequence.id;
+                        option.textContent = sequence.name;
+                        option.dataset.agentConfig = JSON.stringify(sequence.agent_assignment_config || null);
+                        sequenceSelect.appendChild(option);
                     });
+
+                    // Add change listener to show sequence info
+                    sequenceSelect.addEventListener('change', showSequenceInfo);
                 }
             } catch (error) {
                 console.error('Error loading sequences for upload:', error);
+            }
+        }
+
+        // Show information about the selected sequence
+        function showSequenceInfo() {
+            const sequenceSelect = document.getElementById('sequence-select');
+            const sequenceInfo = document.getElementById('sequence-agent-status');
+            const selectedOption = sequenceSelect.options[sequenceSelect.selectedIndex];
+
+            if (!selectedOption || !selectedOption.value) {
+                sequenceInfo.textContent = 'Please select a sequence';
+                return;
+            }
+
+            const agentConfig = JSON.parse(selectedOption.dataset.agentConfig || 'null');
+
+            if (!agentConfig) {
+                sequenceInfo.innerHTML = '<span style="color: #6c757d;">No agent configuration - will use default agent</span>';
+            } else if (agentConfig.mode === 'single') {
+                sequenceInfo.innerHTML = `<span style="color: #28a745;">✓ Single Agent: ${agentConfig.single.agentId}</span>`;
+            } else if (agentConfig.mode === 'distribute') {
+                sequenceInfo.innerHTML = `<span style="color: #007bff;">✓ Multi-Agent: ${agentConfig.distribute.length} agents configured</span>`;
+            } else {
+                sequenceInfo.innerHTML = '<span style="color: #6c757d;">Unknown agent configuration</span>';
             }
         }
 
@@ -3704,6 +4354,7 @@
                 if (addToSequence && sequenceId) {
                     url = `${API_BASE}/api/contacts/upload-to-sequence`;
                     formData.append('sequenceId', sequenceId);
+                    // Agent assignment will be handled automatically by the sequence configuration
                 }
                 
                 const response = await fetch(url, {
@@ -3816,10 +4467,515 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
             return time;
         }
 
+        // Handle sequence tab switching
+        function switchSequenceTab(tabName) {
+            // Update tab buttons
+            const tabBtns = document.querySelectorAll('.sequence-tab-btn');
+            tabBtns.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.tab === tabName) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Update tab content
+            const tabContents = document.querySelectorAll('.sequence-tab-content');
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === `${tabName}-tab`) {
+                    content.classList.add('active');
+                }
+            });
+
+            // Load data for specific tabs
+            if (tabName === 'beta-test') {
+                loadBetaTestMetrics();
+            }
+        }
+
+        // Load beta test metrics for current sequence
+        async function loadBetaTestMetrics() {
+            const sequenceId = document.getElementById('sequenceDetailsModal').dataset.sequenceId;
+            if (!sequenceId) return;
+
+            const metricsTable = document.getElementById('beta-metrics-table');
+            metricsTable.innerHTML = '<div class="loading">Loading agent metrics...</div>';
+
+            try {
+                const fromDate = document.getElementById('beta-from-date').value;
+                const toDate = document.getElementById('beta-to-date').value;
+
+                let url = `${API_BASE}/api/sequences/${sequenceId}/agent-metrics`;
+                const params = new URLSearchParams();
+                if (fromDate) params.append('from', fromDate);
+                if (toDate) params.append('to', toDate);
+                if (params.toString()) {
+                    url += '?' + params.toString();
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayBetaTestMetrics(data.metrics);
+                } else {
+                    metricsTable.innerHTML = '<div class="no-data">Error loading metrics</div>';
+                }
+            } catch (error) {
+                console.error('Error loading beta test metrics:', error);
+                metricsTable.innerHTML = '<div class="no-data">Error loading metrics</div>';
+            }
+        }
+
+        // Display beta test metrics
+        function displayBetaTestMetrics(metrics) {
+            const metricsTable = document.getElementById('beta-metrics-table');
+
+            if (!metrics || metrics.length === 0) {
+                metricsTable.innerHTML = '<div class="no-data">No agent metrics available</div>';
+                return;
+            }
+
+            let html = `
+                <div class="beta-metrics-header">
+                    <div>Agent</div>
+                    <div>Calls</div>
+                    <div>Avg Duration</div>
+                    <div>Interest %</div>
+                    <div>Meetings %</div>
+                    <div>Answer %</div>
+                </div>
+            `;
+
+            metrics.forEach(metric => {
+                html += `
+                    <div class="beta-metrics-row">
+                        <div class="agent-name">${metric.agentName || 'Unknown Agent'}</div>
+                        <div class="metric-value">${metric.n}</div>
+                        <div class="metric-value">${metric.avgDuration}s</div>
+                        <div class="metric-value ${getMetricClass(metric.interestRate)}">${metric.interestRate}%</div>
+                        <div class="metric-value ${getMetricClass(metric.meetingRate)}">${metric.meetingRate}%</div>
+                        <div class="metric-value ${getMetricClass(metric.answerRate)}">${metric.answerRate}%</div>
+                    </div>
+                `;
+            });
+
+            metricsTable.innerHTML = html;
+        }
+
+        // Get CSS class for metric based on value
+        function getMetricClass(value) {
+            if (value >= 70) return 'positive';
+            if (value >= 30) return 'neutral';
+            return 'negative';
+        }
+
+        // ===== SETTINGS TAB FUNCTIONS =====
+
+        // Load settings when settings tab is activated
+        function loadSettings() {
+            console.log('⚙️ Loading settings');
+            loadPhonePool();
+            loadDefaultSettings();
+        }
+
+        // Load phone pool configuration
+        async function loadPhonePool() {
+            try {
+                const response = await fetch(`${API_BASE}/api/settings/phone-pool`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayPhonePool(data.phones);
+                } else {
+                    document.getElementById('current-phone-pool').innerHTML = '<div class="no-data">Error loading phone pool</div>';
+                }
+            } catch (error) {
+                console.error('Error loading phone pool:', error);
+                document.getElementById('current-phone-pool').innerHTML = '<div class="no-data">Error loading phone pool</div>';
+            }
+        }
+
+        // Display phone pool in the UI
+        function displayPhonePool(phones) {
+            const poolContainer = document.getElementById('current-phone-pool');
+
+            if (!phones || phones.length === 0) {
+                poolContainer.innerHTML = '<div class="no-data">No phone numbers configured</div>';
+                return;
+            }
+
+            const phoneItems = phones.map(phone => `
+                <div class="phone-pool-item">
+                    <span class="phone-id">${phone}</span>
+                    <button type="button" class="remove-phone" onclick="removePhone('${phone}')">Remove</button>
+                </div>
+            `).join('');
+
+            poolContainer.innerHTML = phoneItems;
+        }
+
+        // Add a new phone to the pool
+        async function addPhone() {
+            const phoneInput = document.getElementById('new-phone-id');
+            const phoneId = phoneInput.value.trim();
+
+            if (!phoneId) {
+                alert('Please enter a phone ID');
+                return;
+            }
+
+            // Get current pool
+            const currentPhones = await getCurrentPhonePool();
+            if (currentPhones.includes(phoneId)) {
+                alert('This phone ID is already in the pool');
+                return;
+            }
+
+            // Add new phone
+            const newPhones = [...currentPhones, phoneId];
+
+            try {
+                const response = await fetch(`${API_BASE}/api/settings/phone-pool`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phones: newPhones })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayPhonePool(data.phones);
+                    phoneInput.value = '';
+                    alert(`Phone ${phoneId} added successfully!`);
+                } else {
+                    alert('Failed to add phone: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error adding phone:', error);
+                alert('Failed to add phone');
+            }
+        }
+
+        // Remove a phone from the pool
+        async function removePhone(phoneId) {
+            if (!confirm(`Remove ${phoneId} from the phone pool?`)) return;
+
+            const currentPhones = await getCurrentPhonePool();
+            const newPhones = currentPhones.filter(p => p !== phoneId);
+
+            try {
+                const response = await fetch(`${API_BASE}/api/settings/phone-pool`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phones: newPhones })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayPhonePool(data.phones);
+                    alert(`Phone ${phoneId} removed successfully!`);
+                } else {
+                    alert('Failed to remove phone: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error removing phone:', error);
+                alert('Failed to remove phone');
+            }
+        }
+
+        // Get current phone pool from server
+        async function getCurrentPhonePool() {
+            try {
+                const response = await fetch(`${API_BASE}/api/settings/phone-pool`);
+                const data = await response.json();
+                return data.success ? data.phones : [];
+            } catch (error) {
+                console.error('Error getting current phone pool:', error);
+                return [];
+            }
+        }
+
+        // Load default settings (display only)
+        function loadDefaultSettings() {
+            const defaultAgentId = (window.DEFAULT_AGENT_ID || '').toString();
+            const defaultAgentPhone = (window.DEFAULT_AGENT_PHONE || '').toString();
+            const elId = document.getElementById('default-agent-id');
+            const elPhone = document.getElementById('default-agent-phone');
+            if (elId) elId.value = defaultAgentId;
+            if (elPhone) elPhone.value = defaultAgentPhone;
+        }
+
+        // Handle agent config enable/disable
+        function handleAgentConfigToggle() {
+            const enableCheckbox = document.getElementById('enableAgentConfig');
+            const configContainer = document.getElementById('agentConfigContainer');
+            const isEnabled = !!(enableCheckbox && enableCheckbox.checked);
+
+            configContainer.style.display = isEnabled ? 'block' : 'none';
+
+            // Enable/disable all inputs inside container to avoid validating hidden required fields
+            const allInputs = configContainer ? configContainer.querySelectorAll('input, select, textarea') : [];
+            allInputs.forEach((el) => {
+                el.disabled = !isEnabled;
+                if (!isEnabled) {
+                    el.required = false;
+                }
+            });
+
+            updateSequenceAssignmentValidation();
+        }
+
+        // Handle sequence agent assignment mode change
+        function handleSequenceAssignmentModeChange() {
+            const singleMode = document.getElementById('sequenceSingleAgentMode');
+            const distributeMode = document.getElementById('sequenceDistributeAgentsMode');
+            const checked = document.querySelector('input[name="sequenceAssignmentMode"]:checked');
+            const mode = checked ? checked.value : 'single';
+
+            if (mode === 'single') {
+                singleMode.style.display = 'block';
+                distributeMode.style.display = 'none';
+            } else {
+                singleMode.style.display = 'none';
+                distributeMode.style.display = 'block';
+            }
+
+            updateSequenceAssignmentValidation();
+        }
+
+        // Ensure correct required/disabled attributes based on current state
+        function updateSequenceAssignmentValidation() {
+            const enableCheckbox = document.getElementById('enableAgentConfig');
+            const isEnabled = !!(enableCheckbox && enableCheckbox.checked);
+
+            const singleContainer = document.getElementById('sequenceSingleAgentMode');
+            const distributeContainer = document.getElementById('sequenceDistributeAgentsMode');
+
+            const singleInputs = singleContainer ? singleContainer.querySelectorAll('input, select, textarea') : [];
+            const distributeInputs = distributeContainer ? distributeContainer.querySelectorAll('input, select, textarea') : [];
+
+            // If not enabled, disable all and remove required
+            if (!isEnabled) {
+                [...singleInputs, ...distributeInputs].forEach((el) => {
+                    el.disabled = true;
+                    el.required = false;
+                });
+                return;
+            }
+
+            // Enabled: start by enabling all, then tailor per mode
+            [...singleInputs, ...distributeInputs].forEach((el) => {
+                el.disabled = false;
+            });
+
+            const checked = document.querySelector('input[name="sequenceAssignmentMode"]:checked');
+            const mode = checked ? checked.value : 'single';
+
+            if (mode === 'single') {
+                // Single mode: require agent ID input, disable distribute inputs
+                const singleAgentId = document.getElementById('sequenceSingleAgentId');
+                if (singleAgentId) {
+                    singleAgentId.required = true;
+                }
+                distributeInputs.forEach((el) => {
+                    el.required = false;
+                    el.disabled = true;
+                });
+            } else {
+                // Distribute mode: remove single required and disable single inputs
+                singleInputs.forEach((el) => {
+                    el.required = false;
+                    el.disabled = true;
+                });
+                // Require each distribute agentId; phones and weights optional
+                const distributeAgentIdInputs = document.querySelectorAll('.sequence-agent-item .sequence-agent-id');
+                distributeAgentIdInputs.forEach((el) => {
+                    el.required = true;
+                    el.disabled = false;
+                });
+                const otherDistributeInputs = document.querySelectorAll('.sequence-agent-item .sequence-agent-phone, .sequence-agent-item .sequence-agent-weight');
+                otherDistributeInputs.forEach((el) => {
+                    el.required = false;
+                    el.disabled = false;
+                });
+            }
+        }
+
+        // Add new sequence agent to the list
+        function addSequenceAgent() {
+            const agentList = document.getElementById('sequenceAgentList');
+            const agentItems = agentList.querySelectorAll('.sequence-agent-item');
+            const agentNumber = agentItems.length + 1;
+
+            const agentItem = document.createElement('div');
+            agentItem.className = 'sequence-agent-item';
+            agentItem.innerHTML = `
+                <div class="form-group">
+                    <label>Agent ${agentNumber}</label>
+                    <input type="text" class="sequence-agent-id" placeholder="Agent ID" class="form-input">
+                    <input type="text" class="sequence-agent-phone" placeholder="Phone ID" class="form-input">
+                    <input type="number" class="sequence-agent-weight" placeholder="Weight" value="1" min="1" class="form-input weight-input">
+                    <button type="button" class="btn btn-small btn-danger remove-sequence-agent">Remove</button>
+                </div>
+            `;
+
+            agentList.appendChild(agentItem);
+
+            // Add event listener to the remove button
+            const removeBtn = agentItem.querySelector('.remove-sequence-agent');
+            removeBtn.addEventListener('click', function() {
+                agentItem.remove();
+                updateSequenceAgentLabels();
+            });
+
+            updateSequenceAgentLabels();
+            updateSequenceAssignmentValidation();
+        }
+
+        // Update sequence agent labels after adding/removing
+        function updateSequenceAgentLabels() {
+            const agentItems = document.querySelectorAll('.sequence-agent-item');
+            agentItems.forEach((item, index) => {
+                const label = item.querySelector('label');
+                label.textContent = `Agent ${index + 1}`;
+            });
+        }
+
+        // Add new sequence agent to the list
+        function addSequenceAgent() {
+            const agentList = document.getElementById('sequenceAgentList');
+            const agentItems = agentList.querySelectorAll('.sequence-agent-item');
+            const agentNumber = agentItems.length + 1;
+
+            const agentItem = document.createElement('div');
+            agentItem.className = 'sequence-agent-item';
+            agentItem.innerHTML = `
+                <div class="form-group">
+                    <label>Agent ${agentNumber}</label>
+                    <input type="text" class="sequence-agent-id" placeholder="Agent ID *" class="form-input" required>
+                    <input type="text" class="sequence-agent-phone" placeholder="Phone ID (optional)" class="form-input">
+                    <input type="number" class="sequence-agent-weight" placeholder="Weight" value="1" min="1" class="form-input weight-input">
+                    <button type="button" class="btn btn-small btn-danger remove-sequence-agent">Remove</button>
+                </div>
+                <small style="color: #6c757d; font-size: 12px; display: block; margin-top: 5px;">Leave phone ID empty to use random phone from global pool</small>
+            `;
+
+            agentList.appendChild(agentItem);
+
+            // Add event listener to the remove button
+            const removeBtn = agentItem.querySelector('.remove-sequence-agent');
+            removeBtn.addEventListener('click', function() {
+                agentItem.remove();
+                updateSequenceAgentLabels();
+            });
+
+            updateSequenceAgentLabels();
+            updateSequenceAssignmentValidation();
+        }
+
+        // Get sequence agent configuration data for form submission
+        function getSequenceAgentConfig() {
+            const mode = document.querySelector('input[name="sequenceAssignmentMode"]:checked').value;
+
+            if (mode === 'single') {
+                const agentId = document.getElementById('sequenceSingleAgentId').value.trim();
+                const agentPhone = document.getElementById('sequenceSingleAgentPhone').value.trim();
+
+                if (!agentId) {
+                    return null;
+                }
+
+                return {
+                    mode: 'single',
+                    single: {
+                        agentId,
+                        agentPhoneNumberId: agentPhone || null
+                    }
+                };
+            } else {
+                const agentItems = document.querySelectorAll('.sequence-agent-item');
+                const agents = [];
+
+                for (const item of agentItems) {
+                    const agentId = item.querySelector('.sequence-agent-id').value.trim();
+                    const agentPhone = item.querySelector('.sequence-agent-phone').value.trim();
+                    const weight = parseInt(item.querySelector('.sequence-agent-weight').value) || 1;
+
+                    if (agentId) {
+                        agents.push({
+                            agentId,
+                            agentPhoneNumberId: agentPhone || null,
+                            weight
+                        });
+                    }
+                }
+
+                if (agents.length === 0) {
+                    return null;
+                }
+
+                return {
+                    mode: 'distribute',
+                    distribute: agents
+                };
+            }
+        }
+
+        // Populate agent configuration in form when editing
+        function populateAgentConfig(agentConfig) {
+            if (!agentConfig) return;
+
+            // Enable the agent config
+            document.getElementById('enableAgentConfig').checked = true;
+            document.getElementById('agentConfigContainer').style.display = 'block';
+
+            // Set the mode
+            const modeRadio = document.querySelector(`input[name="sequenceAssignmentMode"][value="${agentConfig.mode}"]`);
+            if (modeRadio) {
+                modeRadio.checked = true;
+                handleSequenceAssignmentModeChange();
+            }
+
+            // Populate the fields
+            if (agentConfig.mode === 'single' && agentConfig.single) {
+                document.getElementById('sequenceSingleAgentId').value = agentConfig.single.agentId || '';
+                document.getElementById('sequenceSingleAgentPhone').value = agentConfig.single.agentPhoneNumberId || '';
+            } else if (agentConfig.mode === 'distribute' && agentConfig.distribute) {
+                // Clear existing agents
+                document.getElementById('sequenceAgentList').innerHTML = '';
+
+                // Add each agent
+                agentConfig.distribute.forEach((agent, index) => {
+                    const agentItem = document.createElement('div');
+                    agentItem.className = 'sequence-agent-item';
+                    agentItem.innerHTML = `
+                        <div class="form-group">
+                            <label>Agent ${index + 1}</label>
+                            <input type="text" class="sequence-agent-id" placeholder="Agent ID" value="${agent.agentId}" class="form-input">
+                            <input type="text" class="sequence-agent-phone" placeholder="Phone ID" value="${agent.agentPhoneNumberId}" class="form-input">
+                            <input type="number" class="sequence-agent-weight" placeholder="Weight" value="${agent.weight || 1}" min="1" class="form-input weight-input">
+                            <button type="button" class="btn btn-small btn-danger remove-sequence-agent">Remove</button>
+                        </div>
+                    `;
+
+                    document.getElementById('sequenceAgentList').appendChild(agentItem);
+
+                    // Add event listener to the remove button
+                    const removeBtn = agentItem.querySelector('.remove-sequence-agent');
+                    removeBtn.addEventListener('click', function() {
+                        agentItem.remove();
+                        updateSequenceAgentLabels();
+                    });
+                });
+            }
+        }
+
         // Show sequence modal for adding/editing
         function showSequenceModal(sequence = null, mode = 'add') {
             console.log('showSequenceModal called with:', { sequence, mode });
-            
+
             const modal = document.getElementById('sequenceModal');
             const title = document.getElementById('sequenceModalTitle');
             const form = document.getElementById('sequenceForm');
@@ -3855,20 +5011,38 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
                 // Store sequence ID for update
                 form.dataset.sequenceId = sequence.id;
                 form.dataset.mode = 'edit';
+
+                // Populate agent configuration if it exists
+                if (sequence.agent_assignment_config) {
+                    populateAgentConfig(sequence.agent_assignment_config);
+                    // Sync validation state with populated config
+                    handleAgentConfigToggle();
+                    handleSequenceAssignmentModeChange();
+                }
             } else {
                 console.log('Setting up add mode');
                 title.textContent = 'Add Sequence';
                 form.dataset.sequenceId = '';
                 form.dataset.mode = 'add';
-                
+
                 // Set default business hours
                 document.getElementById('sequenceTimezone').value = 'UTC';
                 document.getElementById('sequenceBusinessHoursStart').value = '09:00';
                 document.getElementById('sequenceBusinessHoursEnd').value = '17:00';
                 document.getElementById('sequenceExcludeWeekends').checked = true;
-                
-                // Update business hours preview
+
+                // Reset agent configuration
+                document.getElementById('enableAgentConfig').checked = false;
+                document.getElementById('agentConfigContainer').style.display = 'none';
+                document.querySelector('input[name="sequenceAssignmentMode"][value="single"]').checked = true;
+                document.getElementById('sequenceSingleAgentId').value = '';
+                document.getElementById('sequenceSingleAgentPhone').value = '';
+                document.getElementById('sequenceAgentList').innerHTML = '';
+
+                // Sync validation state and business hours preview
                 updateBusinessHoursPreview();
+                handleAgentConfigToggle();
+                handleSequenceAssignmentModeChange();
             }
             
             console.log('Showing modal');
@@ -3885,12 +5059,42 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
         function showSequenceDetailsModal(sequenceId) {
             const modal = document.getElementById('sequenceDetailsModal');
             const title = document.getElementById('sequenceDetailsModalTitle');
-            
+
             title.textContent = 'Sequence Details';
-            
+
+            // Store sequence ID for beta test functionality
+            modal.dataset.sequenceId = sequenceId;
+
             // Load sequence details and entries
             loadSequenceDetails(sequenceId);
-            
+
+            // Set up tab event listeners
+            setTimeout(() => {
+                const tabBtns = document.querySelectorAll('.sequence-tab-btn');
+                tabBtns.forEach(btn => {
+                    btn.addEventListener('click', () => switchSequenceTab(btn.dataset.tab));
+                });
+
+                // Set up refresh button for beta test metrics
+                const refreshBtn = document.getElementById('refresh-beta-metrics');
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', () => loadBetaTestMetrics());
+                }
+
+                // Set default date range (last 7 days)
+                const today = new Date();
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(today.getDate() - 7);
+
+                const fromDateInput = document.getElementById('beta-from-date');
+                const toDateInput = document.getElementById('beta-to-date');
+
+                if (fromDateInput && toDateInput) {
+                    fromDateInput.value = sevenDaysAgo.toISOString().split('T')[0];
+                    toDateInput.value = today.toISOString().split('T')[0];
+                }
+            }, 100);
+
             modal.style.display = 'block';
         }
 
@@ -4135,6 +5339,15 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
                         business_hours_end: toHHMMSS(document.getElementById('sequenceBusinessHoursEnd').value),
                         exclude_weekends: document.getElementById('sequenceExcludeWeekends').checked
                     };
+
+                    // Add agent configuration if enabled
+                    const enableAgentConfig = document.getElementById('enableAgentConfig').checked;
+                    if (enableAgentConfig) {
+                        const agentConfig = getSequenceAgentConfig();
+                        if (agentConfig) {
+                            sequenceData.agentConfig = agentConfig;
+                        }
+                    }
                     
                     const mode = sequenceForm.dataset.mode;
                     const sequenceId = sequenceForm.dataset.sequenceId;
@@ -4173,6 +5386,9 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
                         alert('Failed to save sequence');
                     }
                 });
+                // Initialize validation state on open
+                handleAgentConfigToggle();
+                handleSequenceAssignmentModeChange();
             }
         });
 
@@ -4240,8 +5456,33 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
             }
         }
         
-        // Add event listeners for business hours fields
-        document.addEventListener('DOMContentLoaded', function() {
+                    // Add event listeners for agent configuration
+            const enableAgentConfig = document.getElementById('enableAgentConfig');
+            if (enableAgentConfig) {
+                enableAgentConfig.addEventListener('change', handleAgentConfigToggle);
+            }
+
+            const sequenceAssignmentModeRadios = document.querySelectorAll('input[name="sequenceAssignmentMode"]');
+            sequenceAssignmentModeRadios.forEach(radio => {
+                radio.addEventListener('change', handleSequenceAssignmentModeChange);
+            });
+
+            const addSequenceAgentBtn = document.getElementById('addSequenceAgentBtn');
+            if (addSequenceAgentBtn) {
+                addSequenceAgentBtn.addEventListener('click', addSequenceAgent);
+            }
+
+            // Add event listeners for dynamically created remove buttons
+            document.addEventListener('click', function(event) {
+                if (event.target.classList.contains('remove-sequence-agent')) {
+                    event.target.closest('.sequence-agent-item').remove();
+                    updateSequenceAgentLabels();
+                    updateSequenceAssignmentValidation();
+                }
+            });
+
+            // Add event listeners for business hours fields
+            document.addEventListener('DOMContentLoaded', function() {
             const timezoneSelect = document.getElementById('sequenceTimezone');
             const startTimeInput = document.getElementById('sequenceBusinessHoursStart');
             const endTimeInput = document.getElementById('sequenceBusinessHoursEnd');
@@ -4273,9 +5514,9 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
                 });
             }
             
-            const addPhoneBtn = document.getElementById('add-phone-btn');
-            if (addPhoneBtn) {
-                addPhoneBtn.addEventListener('click', () => {
+            const addPhoneNumberBtn = document.getElementById('add-phone-number-btn');
+            if (addPhoneNumberBtn) {
+                addPhoneNumberBtn.addEventListener('click', () => {
                     showPhoneNumberModal(null, 'add');
                 });
             }
@@ -4291,6 +5532,32 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
             if (refreshPhoneNumbersBtn) {
                 refreshPhoneNumbersBtn.addEventListener('click', () => {
                     loadPhoneNumbers(1);
+                });
+            }
+
+            // Settings tab event listeners
+            const saveSettingsBtn = document.getElementById('save-settings-btn');
+            if (saveSettingsBtn) {
+                saveSettingsBtn.addEventListener('click', () => {
+                    alert('Settings saved successfully!');
+                    loadSettings();
+                });
+            }
+
+            const refreshSettingsBtn = document.getElementById('refresh-settings-btn');
+            if (refreshSettingsBtn) {
+                refreshSettingsBtn.addEventListener('click', loadSettings);
+            }
+
+            const addPhoneBtnSettings = document.getElementById('add-phone-btn');
+            if (addPhoneBtnSettings) {
+                addPhoneBtnSettings.addEventListener('click', addPhone);
+            }
+
+            const newPhoneInput = document.getElementById('new-phone-id');
+            if (newPhoneInput) {
+                newPhoneInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') addPhone();
                 });
             }
             
@@ -4374,7 +5641,7 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
                                 <strong>Required columns:</strong>
                                 <ul>
                                     <li>first_name (or last_name)</li>
-                                    <li>phone_number (international format: +1234567890 or 1234567890)</li>
+                                    <li>phone_number (international format: +1234567890 or 1234567890; spaces like "+44 7515 88089" are OK)</li>
                                 </ul>
                             </div>
                             <div class="format-item">
@@ -4398,6 +5665,9 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
                         <select id="sequence-select" style="display: none;">
                             <option value="">Select a sequence...</option>
                         </select>
+                        <div id="sequence-info" class="sequence-info" style="display: none; margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                            <div id="sequence-agent-status">Loading...</div>
+                        </div>
                     </div>
                     
                                             <form id="upload-form" enctype="multipart/form-data">

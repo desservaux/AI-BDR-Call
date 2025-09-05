@@ -35,7 +35,9 @@ async function testBatchCalling() {
                     conversation_initiation_client_data: {
                         dynamic_variables: {
                             name_test: "Martin",
-                            weekday: "Monday"
+                            weekday: "Monday",
+                            company: "Test Company",
+                            role: "Test Manager"
                         },
                         source_info: {
                             source: "twilio", // Using allowed value from API

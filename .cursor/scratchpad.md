@@ -149,6 +149,10 @@ Environment variables (with defaults):
 - [x] Implement draining loop in `services/sequence-batch-caller.js` to submit multiple jobs per tick
 - [x] Add `BATCH_CALLING_MAX_JOBS_PER_TICK` (default 5) guard to cap jobs per tick
 - [x] Expose `maxJobsPerTick` in `/api/sequence-batch-caller/status`
+ - [x] Batch payload fix: remove unsupported `source_info` from recipients and set `scheduled_time_unix` to now + offset
+ - [x] Fail-fast guard: skip claiming if `ELEVENLABS_AGENT_ID`/`ELEVENLABS_PHONE_NUMBER_ID` missing
+ - [x] Update only successfully submitted entries per chunk instead of all claimed
+ - [x] Always include configurable first-name key in `dynamic_variables` (env: `BATCH_CALLING_FIRST_NAME_KEY`, default `name_test`); send empty string when missing
 
 ### Decommission Legacy Sequence Caller
 
@@ -169,3 +173,63 @@ Environment variables (with defaults):
   - GET `/api/sequence-batch-caller/status` → `enabled=true`, `intervalMs≈120000`, `maxJobsPerTick=5`.
   - Load >50 ready entries; observe multiple batch submissions per tick until capped by `maxJobsPerTick`.
   - Confirm sequence entries are advanced immediately after submission.
+  - Validate ElevenLabs job submissions succeed (no 400/422). Check that recipients only include `phone_number`, `conversation_initiation_client_data`, and `dynamic_variables`.
+  - Verify `scheduled_time_unix` on requests equals current time ± `BATCH_CALLING_SCHEDULE_OFFSET_SEC`.
+  - Simulate missing envs and ensure tick logs error and does not claim entries.
+  - Set `BATCH_CALLING_FIRST_NAME_KEY` to match the agent (e.g., `user_name`), confirm `dynamic_variables` always includes that key; when first name absent, value is `""`.
+
+### Background and Motivation (Addendum: Contact Import Phone Normalization)
+
+Users often provide international phone numbers with embedded spaces (e.g., "+44 7515 88089"). Our current CSV/XLSX import rejects these in early validation, even though later normalization can handle them. We should strip whitespace prior to validation so spaced numbers are accepted and normalized consistently.
+
+### Key Challenges and Analysis (Contact Import)
+
+- Early validation in `parseCSVRow` uses a strict regex that fails on spaces.
+- The later `normalizePhoneNumber` already removes non-digits except "+", but it is never reached if validation fails first.
+- Must ensure deduplication and sequence-adding flows remain unchanged (phone stored in canonical `+E.164` format).
+
+### High-level Task Breakdown (Contact Import)
+
+1) Parser: Strip all whitespace from `phone_number` in `parseCSVRow` before validation.
+   - Success: "+44 7515 88089" passes validation and proceeds to normalization.
+2) Normalization: Reuse existing `normalizePhoneNumber` (no behavior change) during row processing.
+   - Success: Stored number becomes `+44751588089`.
+3) UI copy: Update upload modal to tell users spaces are OK.
+   - Success: Copy mentions acceptance of spaces with example.
+4) Manual QA: Upload CSV and XLSX with spaced numbers; verify contacts/phones created and sequences can be populated.
+   - Success: No errors; duplicates still detected; sequence add works.
+
+### Project Status Board (Contact Import)
+
+- [x] Contact Import: Strip whitespace before validation in `parseCSVRow`
+- [x] Contact Import: Update upload modal copy to mention spaces are OK
+- [ ] Contact Import: Manual QA for CSV/XLSX with spaced numbers
+
+### Executor's Feedback or Assistance Requests (Agent Assignment Config Column)
+
+- Observed error when creating/updating sequences with agent config: "Could not find the 'agent_assignment_config' column of 'sequences' in the schema cache". This indicates the DB migration hasn't been applied.
+- Implemented backend fallback: if the column is missing, create/update proceeds without `agent_assignment_config` (feature disabled until migration).
+- Please run the migration to enable the feature fully.
+
+Migration steps (Supabase SQL):
+1) Open SQL editor and run statements from `migration-sequence-beta-testing.sql`:
+   - Add `agent_assignment_config` JSONB to `sequences`
+   - Add assignment columns to `sequence_entries` and index
+2) If using CLI, apply the SQL file directly.
+3) After running, refresh schema cache (Supabase auto-refreshes; otherwise do a quick SELECT on `sequences`).
+
+Verification:
+- `select agent_assignment_config from sequences limit 1;` should succeed.
+- Create/edit a sequence with Single/Distribute agent config; it should persist.
+
+### Project Status Board (Agent Assignment Config)
+
+- [x] UI: Hidden-required fix for distribute agents inputs in `public/index.html`
+- [x] UI: Optional phone IDs in single/distribute config
+- [x] UI: Initialize toggle/required state on open and changes
+- [x] Backend: Fallback when `agent_assignment_config` column missing (graceful degrade)
+- [ ] Ops: Apply `migration-sequence-beta-testing.sql` to add the missing column
+
+### Lessons (Addendum)
+
+- When adding optional JSON config columns, guard server writes with fallbacks so core flows work even if migrations are pending.

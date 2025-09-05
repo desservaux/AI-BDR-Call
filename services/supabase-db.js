@@ -1009,6 +1009,54 @@ class SupabaseDBService {
     }
 
     /**
+     * Get contact information by phone number
+     * @param {string} phoneNumber - Phone number to search for
+     * @returns {Promise<Object|null>} Contact data or null if not found
+     */
+    async getContactByPhoneNumber(phoneNumber) {
+        try {
+            // First normalize the phone number for comparison
+            const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
+            if (!normalizedPhone) {
+                return null;
+            }
+
+            // Get contact by joining with phone_numbers table
+            const { data: contact, error: contactError } = await this.client
+                .from('phone_numbers')
+                .select(`
+                    contacts (
+                        id,
+                        first_name,
+                        last_name,
+                        email,
+                        company_name,
+                        position,
+                        notes,
+                        do_not_call,
+                        created_at,
+                        updated_at
+                    )
+                `)
+                .eq('phone_number', normalizedPhone)
+                .single();
+
+            if (contactError) {
+                if (contactError.code === 'PGRST116') { // No rows returned
+                    return null;
+                }
+                throw contactError;
+            }
+
+            // Return the contact data (contacts is an array from the join, take first element)
+            return contact.contacts || null;
+        } catch (error) {
+            console.error('Error getting contact by phone number:', error.message);
+            throw new Error(`Failed to get contact: ${error.message}`);
+        }
+    }
+
+    /**
      * Update contact
      * @param {string} contactId - Contact ID
      * @param {Object} updateData - Update data
@@ -1332,21 +1380,45 @@ class SupabaseDBService {
     // ===== SEQUENCE MANAGEMENT =====
 
     /**
-     * Create a new sequence
+     * Create a new sequence with optional agent configuration
      * @param {Object} sequenceData - Sequence data
+     * @param {Object} [agentConfig] - Agent assignment configuration
+     * @param {string} [agentConfig.mode] - 'single' or 'distribute'
+     * @param {Object} [agentConfig.single] - Single agent config {agentId, agentPhoneNumberId}
+     * @param {Array} [agentConfig.distribute] - Agent distribution config [{agentId, agentPhoneNumberId, weight}]
      * @returns {Promise<Object>} Created sequence
      */
-    async createSequence(sequenceData) {
+    async createSequence(sequenceData, agentConfig = null) {
         try {
-            const { data, error } = await this.client
+            // Build insert payload without mutating caller-provided object
+            const insertData = { ...sequenceData };
+            if (agentConfig) {
+                insertData.agent_assignment_config = this.formatAgentAssignmentConfig(agentConfig);
+            }
+
+            // First attempt including agent_assignment_config when provided
+            let { data, error } = await this.client
                 .from('sequences')
-                .insert([sequenceData])
+                .insert([insertData])
                 .select()
                 .single();
 
+            // Fallback if the column is missing in the DB schema
+            if (error && this.isAgentConfigColumnMissingError(error)) {
+                console.warn("Agent assignment config column missing; creating sequence without agent config. Apply the migration to enable this feature.");
+                delete insertData.agent_assignment_config;
+                const retry = await this.client
+                    .from('sequences')
+                    .insert([insertData])
+                    .select()
+                    .single();
+                data = retry.data;
+                error = retry.error;
+            }
+
             if (error) throw error;
-            
-            console.log(`✅ Sequence created with ID: ${data.id}`);
+
+            console.log(`✅ Sequence created with ID: ${data.id}${agentConfig ? ' (with agent config)' : ''}`);
             return data;
         } catch (error) {
             console.error('Error creating sequence:', error.message);
@@ -1390,12 +1462,15 @@ class SupabaseDBService {
     }
 
     /**
-     * Add phone number to sequence
+     * Add phone number to sequence with optional agent assignment
      * @param {string} sequenceId - Sequence ID
      * @param {string} phoneNumberId - Phone number ID
+     * @param {Object} [assignment] - Optional agent assignment
+     * @param {string} [assignment.agentId] - ElevenLabs agent ID
+     * @param {string} [assignment.agentPhoneNumberId] - ElevenLabs phone number ID
      * @returns {Promise<Object>} Created sequence entry
      */
-    async addPhoneNumberToSequence(sequenceId, phoneNumberId) {
+    async addPhoneNumberToSequence(sequenceId, phoneNumberId, assignment = {}) {
         try {
             // Check if already present
             const { data: existing, error: findErr } = await this.client
@@ -1447,16 +1522,30 @@ class SupabaseDBService {
                 console.warn('Business hours initialization failed, defaulting next_call_time to now:', bhError.message);
             }
 
+            // Prepare insert data with optional agent assignment
+            const insertData = {
+                sequence_id: sequenceId,
+                phone_number_id: phoneNumberId,
+                status: 'active',
+                current_attempt: initialAttempt,
+                next_call_time: initialNextCallTimeIso
+            };
+
+            // Add agent assignment if provided
+            if (assignment.agentId) {
+                insertData.assigned_agent_id = assignment.agentId;
+            }
+            if (assignment.agentPhoneNumberId) {
+                insertData.assigned_agent_phone_number_id = assignment.agentPhoneNumberId;
+            }
+            if (assignment.agentId || assignment.agentPhoneNumberId) {
+                insertData.assigned_at = new Date().toISOString();
+            }
+
             // Insert; DB unique constraint will prevent duplicates under race
             const { data, error } = await this.client
                 .from('sequence_entries')
-                .insert([{
-                    sequence_id: sequenceId,
-                    phone_number_id: phoneNumberId,
-                    status: 'active',
-                    current_attempt: initialAttempt,
-                    next_call_time: initialNextCallTimeIso
-                }])
+                .insert([insertData])
                 .select()
                 .single();
 
@@ -1830,28 +1919,163 @@ class SupabaseDBService {
     }
 
     /**
-     * Update sequence
+     * Update sequence with optional agent configuration
      * @param {string} sequenceId - Sequence ID
      * @param {Object} updateData - Update data
+     * @param {Object} [agentConfig] - Agent assignment configuration
      * @returns {Promise<Object>} Updated sequence
      */
-    async updateSequence(sequenceId, updateData) {
+    async updateSequence(sequenceId, updateData, agentConfig = null) {
         try {
-            const { data, error } = await this.client
+            // Build update payload without mutating caller-provided object
+            const updatePayload = { ...updateData };
+            if (agentConfig) {
+                updatePayload.agent_assignment_config = this.formatAgentAssignmentConfig(agentConfig);
+            }
+
+            // First attempt including agent_assignment_config when provided
+            let { data, error } = await this.client
                 .from('sequences')
-                .update(updateData)
+                .update(updatePayload)
                 .eq('id', sequenceId)
                 .select()
                 .single();
 
+            // Fallback if the column is missing in the DB schema
+            if (error && this.isAgentConfigColumnMissingError(error)) {
+                console.warn("Agent assignment config column missing; updating sequence without agent config. Apply the migration to enable this feature.");
+                delete updatePayload.agent_assignment_config;
+                const retry = await this.client
+                    .from('sequences')
+                    .update(updatePayload)
+                    .eq('id', sequenceId)
+                    .select()
+                    .single();
+                data = retry.data;
+                error = retry.error;
+            }
+
             if (error) throw error;
-            
-            console.log(`✅ Sequence updated: ${sequenceId}`);
+
+            console.log(`✅ Sequence updated: ${sequenceId}${agentConfig ? ' (with agent config)' : ''}`);
             return data;
         } catch (error) {
             console.error('Error updating sequence:', error.message);
             throw new Error(`Failed to update sequence: ${error.message}`);
         }
+    }
+
+    /**
+     * Format agent assignment configuration for storage
+     * @param {Object} agentConfig - Agent configuration input
+     * @returns {Object} Formatted configuration for database
+     */
+    formatAgentAssignmentConfig(agentConfig) {
+        if (!agentConfig) return null;
+
+        const formatted = {
+            mode: agentConfig.mode || 'single'
+        };
+
+        if (agentConfig.mode === 'single' && agentConfig.single) {
+            formatted.single = {
+                agentId: agentConfig.single.agentId,
+                agentPhoneNumberId: agentConfig.single.agentPhoneNumberId
+            };
+        } else if (agentConfig.mode === 'distribute' && agentConfig.distribute) {
+            formatted.distribute = agentConfig.distribute.map(agent => ({
+                agentId: agent.agentId,
+                agentPhoneNumberId: agent.agentPhoneNumberId,
+                weight: agent.weight || 1
+            }));
+        }
+
+        return formatted;
+    }
+
+    /**
+     * Detect if an error is due to missing agent_assignment_config column
+     * @param {any} error
+     * @returns {boolean}
+     */
+    isAgentConfigColumnMissingError(error) {
+        try {
+            const msg = (error && (error.message || error.hint || error.details) || '').toString().toLowerCase();
+            const code = (error && (error.code || error.status)) || '';
+            if (!msg) return false;
+            const mentionsColumn = msg.includes('agent_assignment_config') && (msg.includes('schema cache') || msg.includes('column') || msg.includes('does not exist') || msg.includes('unknown column'));
+            const isUndefinedColumnCode = code === '42703';
+            return mentionsColumn || isUndefinedColumnCode;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /**
+     * Get agent assignment configuration for a sequence
+     * @param {string} sequenceId - Sequence ID
+     * @returns {Promise<Object>} Agent configuration or null
+     */
+    async getSequenceAgentConfig(sequenceId) {
+        try {
+            const sequence = await this.getSequenceById(sequenceId);
+            return sequence?.agent_assignment_config || null;
+        } catch (error) {
+            console.warn(`Could not get agent config for sequence ${sequenceId}:`, error.message);
+            return null;
+        }
+    }
+
+
+    /**
+     * Auto-assign agents based on sequence configuration
+     * @param {string} sequenceId - Sequence ID
+     * @param {Array} phoneNumberIds - Phone number IDs to assign agents to
+     * @returns {Promise<Array>} Array of assignment objects
+     */
+    async autoAssignAgentsToSequence(sequenceId, phoneNumberIds) {
+        const assignments = [];
+        const agentConfig = await this.getSequenceAgentConfig(sequenceId);
+
+        if (!agentConfig || phoneNumberIds.length === 0) {
+            return assignments;
+        }
+
+        // Convert sequence config to agent options format
+        let agentOptions = [];
+        if (agentConfig.mode === 'single' && agentConfig.single) {
+            agentOptions = [{
+                agentId: agentConfig.single.agentId,
+                agentPhoneNumberId: agentConfig.single.agentPhoneNumberId || null, // Optional now
+                weight: 1
+            }];
+        } else if (agentConfig.mode === 'distribute' && agentConfig.distribute) {
+            agentOptions = agentConfig.distribute.map(agent => ({
+                agentId: agent.agentId,
+                agentPhoneNumberId: agent.agentPhoneNumberId || null, // Optional now
+                weight: agent.weight || 1
+            }));
+        }
+
+        if (agentOptions.length === 0) {
+            return assignments;
+        }
+
+        // Distribute agents across phone numbers
+        const distribution = this.distributeAgentsToEntries(phoneNumberIds.length, agentOptions);
+
+        for (let i = 0; i < phoneNumberIds.length; i++) {
+            const assignment = distribution[i];
+            if (assignment) {
+                assignments.push({
+                    phoneNumberId: phoneNumberIds[i],
+                    agentId: assignment.agentId,
+                    agentPhoneNumberId: assignment.agentPhoneNumberId // May be null, will use global pool
+                });
+            }
+        }
+
+        return assignments;
     }
 
     /**
@@ -2188,19 +2412,47 @@ class SupabaseDBService {
         try {
             // First process the CSV normally
             const uploadResult = await this.processCSVUpload(csvContent);
-            
+
             // Then add only the phone numbers from this upload to the sequence
             const phoneNumberIds = Array.isArray(uploadResult.phone_number_ids) ? uploadResult.phone_number_ids : [];
             const sequenceResult = await this.addPhoneNumbersToSequence(sequenceId, phoneNumberIds);
-            
+
             uploadResult.sequence_additions = sequenceResult.added;
             uploadResult.sequence_errors = sequenceResult.errors;
-            
+
             return uploadResult;
 
         } catch (error) {
             console.error('Error processing CSV upload to sequence:', error.message);
             throw new Error(`Failed to process CSV upload to sequence: ${error.message}`);
+        }
+    }
+
+    /**
+     * Process CSV upload and add to sequence with agent distribution
+     * @param {string} csvContent - CSV file content
+     * @param {string} sequenceId - Sequence ID to add phone numbers to
+     * @param {Array} agentOptions - Array of agent objects with agentId, agentPhoneNumberId, and optional weight
+     * @returns {Promise<Object>} Upload result with statistics and assignments
+     */
+    async processCSVUploadToSequenceWithAgents(csvContent, sequenceId, agentOptions) {
+        try {
+            // First process the CSV normally
+            const uploadResult = await this.processCSVUpload(csvContent);
+
+            // Then add only the phone numbers from this upload to the sequence with agent assignment
+            const phoneNumberIds = Array.isArray(uploadResult.phone_number_ids) ? uploadResult.phone_number_ids : [];
+            const sequenceResult = await this.addPhoneNumbersToSequenceWithAgents(sequenceId, phoneNumberIds, agentOptions);
+
+            uploadResult.sequence_additions = sequenceResult.added;
+            uploadResult.sequence_errors = sequenceResult.errors;
+            uploadResult.agent_assignments = sequenceResult.assignments;
+
+            return uploadResult;
+
+        } catch (error) {
+            console.error('Error processing CSV upload to sequence with agents:', error.message);
+            throw new Error(`Failed to process CSV upload to sequence with agents: ${error.message}`);
         }
     }
 
@@ -2214,19 +2466,47 @@ class SupabaseDBService {
         try {
             // First process the XLSX normally
             const uploadResult = await this.processXLSXUpload(xlsxBuffer);
-            
+
             // Then add only the phone numbers from this upload to the sequence
             const phoneNumberIds = Array.isArray(uploadResult.phone_number_ids) ? uploadResult.phone_number_ids : [];
             const sequenceResult = await this.addPhoneNumbersToSequence(sequenceId, phoneNumberIds);
-            
+
             uploadResult.sequence_additions = sequenceResult.added;
             uploadResult.sequence_errors = sequenceResult.errors;
-            
+
             return uploadResult;
 
         } catch (error) {
             console.error('Error processing XLSX upload to sequence:', error.message);
             throw new Error(`Failed to process XLSX upload to sequence: ${error.message}`);
+        }
+    }
+
+    /**
+     * Process XLSX upload and add to sequence with agent distribution
+     * @param {Buffer} xlsxBuffer - XLSX file buffer
+     * @param {string} sequenceId - Sequence ID to add phone numbers to
+     * @param {Array} agentOptions - Array of agent objects with agentId, agentPhoneNumberId, and optional weight
+     * @returns {Promise<Object>} Upload result with statistics and assignments
+     */
+    async processXLSXUploadToSequenceWithAgents(xlsxBuffer, sequenceId, agentOptions) {
+        try {
+            // First process the XLSX normally
+            const uploadResult = await this.processXLSXUpload(xlsxBuffer);
+
+            // Then add only the phone numbers from this upload to the sequence with agent assignment
+            const phoneNumberIds = Array.isArray(uploadResult.phone_number_ids) ? uploadResult.phone_number_ids : [];
+            const sequenceResult = await this.addPhoneNumbersToSequenceWithAgents(sequenceId, phoneNumberIds, agentOptions);
+
+            uploadResult.sequence_additions = sequenceResult.added;
+            uploadResult.sequence_errors = sequenceResult.errors;
+            uploadResult.agent_assignments = sequenceResult.assignments;
+
+            return uploadResult;
+
+        } catch (error) {
+            console.error('Error processing XLSX upload to sequence with agents:', error.message);
+            throw new Error(`Failed to process XLSX upload to sequence with agents: ${error.message}`);
         }
     }
 
@@ -2243,6 +2523,11 @@ class SupabaseDBService {
         headers.forEach((header, index) => {
             data[header] = values[index] || '';
         });
+
+        // Strip whitespace in phone_number to support formats like "+44 7515 88089"
+        if (data.phone_number) {
+            data.phone_number = String(data.phone_number).replace(/\s+/g, '');
+        }
 
         // Validate required fields
         if (!data.first_name && !data.last_name) {
@@ -2411,7 +2696,7 @@ class SupabaseDBService {
     }
 
     /**
-     * Add multiple phone numbers to a sequence
+     * Add multiple phone numbers to a sequence with auto-agent assignment
      * @param {string} sequenceId - Sequence ID
      * @param {Array} phoneNumbers - Array of phone number objects
      * @returns {Promise<Object>} Result with added count and errors
@@ -2419,9 +2704,28 @@ class SupabaseDBService {
     async addPhoneNumbersToSequence(sequenceId, phoneNumberIds) {
         const result = { added: 0, alreadyInSequence: 0, errors: [] };
         const ids = Array.isArray(phoneNumberIds) ? Array.from(new Set(phoneNumberIds)) : [];
+
+        if (ids.length === 0) {
+            return result;
+        }
+
+        // Auto-assign agents based on sequence configuration
+        const autoAssignments = await this.autoAssignAgentsToSequence(sequenceId, ids);
+        const assignmentsMap = new Map();
+
+        // Create a map of phoneNumberId -> assignment for quick lookup
+        autoAssignments.forEach(assignment => {
+            assignmentsMap.set(assignment.phoneNumberId, {
+                agentId: assignment.agentId,
+                agentPhoneNumberId: assignment.agentPhoneNumberId
+            });
+        });
+
+        // Add each phone number with its assigned agent
         for (const id of ids) {
             try {
-                const r = await this.addPhoneNumberToSequence(sequenceId, id);
+                const assignment = assignmentsMap.get(id);
+                const r = await this.addPhoneNumberToSequence(sequenceId, id, assignment);
                 if (r && r.status === 'exists') {
                     result.alreadyInSequence++;
                 } else if (r && r.status === 'added') {
@@ -2435,6 +2739,400 @@ class SupabaseDBService {
             }
         }
         return result;
+    }
+
+    /**
+     * Add multiple phone numbers to a sequence with agent distribution
+     * @param {string} sequenceId - Sequence ID
+     * @param {Array} phoneNumberIds - Array of phone number IDs
+     * @param {Array} agentOptions - Array of agent objects with agentId, agentPhoneNumberId, and optional weight
+     * @returns {Promise<Object>} Result with added count, assignments, and errors
+     */
+    async addPhoneNumbersToSequenceWithAgents(sequenceId, phoneNumberIds, agentOptions) {
+        const result = { added: 0, alreadyInSequence: 0, assignments: [], errors: [] };
+        const ids = Array.isArray(phoneNumberIds) ? Array.from(new Set(phoneNumberIds)) : [];
+
+        if (!agentOptions || agentOptions.length === 0) {
+            // Fall back to regular add without assignments
+            return await this.addPhoneNumbersToSequence(sequenceId, ids);
+        }
+
+        // Distribute agents across phone numbers
+        const assignments = this.distributeAgentsToEntries(ids.length, agentOptions);
+
+        for (let i = 0; i < ids.length; i++) {
+            try {
+                const assignment = assignments[i] || {};
+                const r = await this.addPhoneNumberToSequence(sequenceId, ids[i], assignment);
+                if (r && r.status === 'exists') {
+                    result.alreadyInSequence++;
+                } else if (r && r.status === 'added') {
+                    result.added++;
+                    result.assignments.push({
+                        phoneNumberId: ids[i],
+                        agentId: assignment.agentId,
+                        agentPhoneNumberId: assignment.agentPhoneNumberId
+                    });
+                } else {
+                    // Fallback if function returns a raw entry
+                    result.added++;
+                    result.assignments.push({
+                        phoneNumberId: ids[i],
+                        agentId: assignment.agentId,
+                        agentPhoneNumberId: assignment.agentPhoneNumberId
+                    });
+                }
+            } catch (error) {
+                result.errors.push(`PhoneNumberId ${ids[i]}: ${error.message}`);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Distribute agents across entries using weights
+     * @param {number} entryCount - Number of entries to distribute to
+     * @param {Array} agentOptions - Array of agent objects with agentId, agentPhoneNumberId, and optional weight
+     * @returns {Array} Array of assignment objects
+     */
+    distributeAgentsToEntries(entryCount, agentOptions) {
+        const assignments = [];
+
+        if (!agentOptions || agentOptions.length === 0) {
+            return assignments;
+        }
+
+        // Calculate total weight
+        const totalWeight = agentOptions.reduce((sum, option) => sum + (option.weight || 1), 0);
+
+        // Distribute entries based on weights
+        let currentIndex = 0;
+        for (let i = 0; i < entryCount; i++) {
+            const targetPosition = (i * totalWeight) / entryCount;
+            let cumulativeWeight = 0;
+            let selectedAgent = agentOptions[0]; // fallback
+
+            for (const agent of agentOptions) {
+                cumulativeWeight += agent.weight || 1;
+                if (targetPosition < cumulativeWeight) {
+                    selectedAgent = agent;
+                    break;
+                }
+            }
+
+            assignments.push({
+                agentId: selectedAgent.agentId,
+                agentPhoneNumberId: selectedAgent.agentPhoneNumberId
+            });
+        }
+
+        return assignments;
+    }
+
+    /**
+     * Reassign agents to existing sequence entries
+     * @param {string} sequenceId - Sequence ID
+     * @param {Array} agentOptions - Array of agent objects with agentId, agentPhoneNumberId, and optional weight
+     * @returns {Promise<Object>} Result with updated count and assignments
+     */
+    async reassignAgentsToSequence(sequenceId, agentOptions) {
+        const result = { updated: 0, assignments: [], errors: [] };
+
+        try {
+            // Get all active entries for this sequence
+            const { data: entries, error } = await this.client
+                .from('sequence_entries')
+                .select('id, phone_number_id')
+                .eq('sequence_id', sequenceId)
+                .eq('status', 'active');
+
+            if (error) throw error;
+
+            if (entries.length === 0) {
+                return result;
+            }
+
+            // Distribute agents across existing entries
+            const assignments = this.distributeAgentsToEntries(entries.length, agentOptions);
+
+            // Update each entry with new assignment
+            for (let i = 0; i < entries.length; i++) {
+                try {
+                    const assignment = assignments[i] || {};
+                    const updateData = {
+                        assigned_agent_id: assignment.agentId || null,
+                        assigned_agent_phone_number_id: assignment.agentPhoneNumberId || null
+                    };
+
+                    if (assignment.agentId || assignment.agentPhoneNumberId) {
+                        updateData.assigned_at = new Date().toISOString();
+                    }
+
+                    const { error: updateError } = await this.client
+                        .from('sequence_entries')
+                        .update(updateData)
+                        .eq('id', entries[i].id);
+
+                    if (updateError) throw updateError;
+
+                    result.updated++;
+                    result.assignments.push({
+                        sequenceEntryId: entries[i].id,
+                        phoneNumberId: entries[i].phone_number_id,
+                        agentId: assignment.agentId,
+                        agentPhoneNumberId: assignment.agentPhoneNumberId
+                    });
+                } catch (updateError) {
+                    result.errors.push(`Entry ${entries[i].id}: ${updateError.message}`);
+                }
+            }
+
+        } catch (error) {
+            result.errors.push(`Failed to reassign agents: ${error.message}`);
+        }
+
+        return result;
+    }
+
+    /**
+     * Get agent metrics for a sequence (beta testing analytics)
+     * @param {string} sequenceId - Sequence ID
+     * @param {Object} filters - Optional filters
+     * @param {string} [filters.from] - Start date (ISO string)
+     * @param {string} [filters.to] - End date (ISO string)
+     * @returns {Promise<Array>} Array of agent metrics
+     */
+    async getSequenceAgentMetrics(sequenceId, filters = {}) {
+        try {
+            let query = this.client
+                .from('calls')
+                .select(`
+                    agent_id,
+                    agent_name,
+                    duration_seconds,
+                    call_result,
+                    booking_analysis!inner (
+                        meeting_booked,
+                        person_interested
+                    )
+                `)
+                .eq('sequence_id', sequenceId)
+                .not('agent_id', 'is', null)
+                .not('call_result', 'is', null);
+
+            // Apply date filters if provided
+            if (filters.from) {
+                query = query.gte('created_at', filters.from);
+            }
+            if (filters.to) {
+                query = query.lte('created_at', filters.to);
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+
+            // Group by agent and calculate metrics
+            const agentMetrics = {};
+            for (const call of data || []) {
+                const agentId = call.agent_id;
+                if (!agentMetrics[agentId]) {
+                    agentMetrics[agentId] = {
+                        agentId,
+                        agentName: call.agent_name || 'Unknown Agent',
+                        n: 0,
+                        totalDuration: 0,
+                        interestCount: 0,
+                        meetingCount: 0,
+                        answeredCount: 0
+                    };
+                }
+
+                const metrics = agentMetrics[agentId];
+                metrics.n++;
+                if (call.duration_seconds) {
+                    metrics.totalDuration += call.duration_seconds;
+                }
+                if (call.booking_analysis?.person_interested) {
+                    metrics.interestCount++;
+                }
+                if (call.booking_analysis?.meeting_booked) {
+                    metrics.meetingCount++;
+                }
+                if (call.call_result === 'answered') {
+                    metrics.answeredCount++;
+                }
+            }
+
+            // Calculate rates and averages
+            const results = Object.values(agentMetrics).map(metrics => ({
+                agentId: metrics.agentId,
+                agentName: metrics.agentName,
+                n: metrics.n,
+                avgDuration: metrics.n > 0 ? Math.round(metrics.totalDuration / metrics.n) : 0,
+                interestRate: metrics.n > 0 ? Math.round((metrics.interestCount / metrics.n) * 100) : 0,
+                meetingRate: metrics.n > 0 ? Math.round((metrics.meetingCount / metrics.n) * 100) : 0,
+                answerRate: metrics.n > 0 ? Math.round((metrics.answeredCount / metrics.n) * 100) : 0
+            }));
+
+            // Sort by call count descending
+            return results.sort((a, b) => b.n - a.n);
+
+        } catch (error) {
+            console.error('Error getting sequence agent metrics:', error.message);
+            throw new Error(`Failed to get sequence agent metrics: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get setting value by key
+     * @param {string} key - Setting key
+     * @param {any} defaultValue - Default value if setting not found
+     * @returns {Promise<any>} Setting value
+     */
+    async getSetting(key, defaultValue = null) {
+        try {
+            const { data, error } = await this.client
+                .from('settings')
+                .select('setting_value, setting_type')
+                .eq('setting_key', key)
+                .single();
+
+            if (error) {
+                if (error.code === 'PGRST116') { // No rows returned
+                    return defaultValue;
+                }
+                throw error;
+            }
+
+            // Parse value based on type
+            switch (data.setting_type) {
+                case 'boolean':
+                    return data.setting_value === 'true';
+                case 'number':
+                    return parseFloat(data.setting_value);
+                case 'json':
+                    return JSON.parse(data.setting_value);
+                default:
+                    return data.setting_value;
+            }
+        } catch (error) {
+            console.error(`Error getting setting ${key}:`, error.message);
+            return defaultValue;
+        }
+    }
+
+    /**
+     * Set setting value
+     * @param {string} key - Setting key
+     * @param {any} value - Setting value
+     * @param {string} type - Setting type (string, number, boolean, json)
+     * @param {string} description - Setting description
+     * @param {boolean} isSystem - Whether this is a system setting
+     * @returns {Promise<boolean>} Success status
+     */
+    async setSetting(key, value, type = 'string', description = '', isSystem = false) {
+        try {
+            // Convert value to string for storage
+            let stringValue;
+            switch (type) {
+                case 'boolean':
+                    stringValue = value ? 'true' : 'false';
+                    break;
+                case 'json':
+                    stringValue = JSON.stringify(value);
+                    break;
+                default:
+                    stringValue = String(value);
+            }
+
+            const { error } = await this.client
+                .from('settings')
+                .upsert({
+                    setting_key: key,
+                    setting_value: stringValue,
+                    setting_type: type,
+                    description: description,
+                    is_system: isSystem,
+                    updated_at: new Date().toISOString()
+                }, {
+                    onConflict: 'setting_key'
+                });
+
+            if (error) throw error;
+
+            console.log(`✅ Setting updated: ${key} = ${value}`);
+            return true;
+        } catch (error) {
+            console.error(`Error setting ${key}:`, error.message);
+            throw new Error(`Failed to set setting: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get phone pool configuration from database
+     * @returns {Promise<Array>} Array of phone number IDs
+     */
+    async getPhonePool() {
+        try {
+            const phonePoolString = await this.getSetting('phone_pool', '');
+            if (!phonePoolString) return [];
+
+            return phonePoolString.split(',').map(p => p.trim()).filter(p => p.length > 0);
+        } catch (error) {
+            console.error('Error getting phone pool:', error.message);
+            return [];
+        }
+    }
+
+    /**
+     * Set phone pool configuration in database
+     * @param {Array} phones - Array of phone number IDs
+     * @returns {Promise<boolean>} Success status
+     */
+    async setPhonePool(phones) {
+        try {
+            if (!Array.isArray(phones)) {
+                throw new Error('phones must be an array');
+            }
+
+            const validPhones = phones
+                .filter(p => typeof p === 'string' && p.trim().length > 0)
+                .map(p => p.trim());
+
+            const phonePoolString = validPhones.join(',');
+
+            await this.setSetting(
+                'phone_pool',
+                phonePoolString,
+                'string',
+                'Comma-separated list of phone number IDs for random selection',
+                false
+            );
+
+            console.log(`✅ Phone pool updated with ${validPhones.length} phones`);
+            return true;
+        } catch (error) {
+            console.error('Error setting phone pool:', error.message);
+            throw new Error(`Failed to set phone pool: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get a random phone number from the database-stored phone pool
+     * @returns {Promise<string|null>} Random phone number ID or null if pool is empty
+     */
+    async getRandomPhoneFromPool() {
+        try {
+            const phones = await this.getPhonePool();
+            if (phones.length === 0) return null;
+
+            const randomIndex = Math.floor(Math.random() * phones.length);
+            return phones[randomIndex];
+        } catch (error) {
+            console.error('Error getting random phone from pool:', error.message);
+            return null;
+        }
     }
 }
 

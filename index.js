@@ -62,6 +62,16 @@ app.get('/health', (req, res) => {
     });
 });
 
+// Environment variables status endpoint
+app.get('/env-status', (req, res) => {
+    res.json({
+        elevenlabsApiKey: !!process.env.ELEVENLABS_API_KEY,
+        elevenlabsAgentId: !!process.env.ELEVENLABS_AGENT_ID,
+        elevenlabsPhoneNumberId: !!process.env.ELEVENLABS_PHONE_NUMBER_ID,
+        timestamp: new Date().toISOString()
+    });
+});
+
 // ElevenLabs service test endpoint
 app.get('/test-elevenlabs', async (req, res) => {
     try {
@@ -101,20 +111,41 @@ app.post('/make-call', async (req, res) => {
         console.log(`🚀 Making ElevenLabs call to ${phoneNumber}`);
 
         // Get ElevenLabs configuration from environment
-        const agentId = process.env.ELEVENLABS_AGENT_ID || 'agent_01jzr5hv9eefkbmnyz8y6smw19';
-        const agentPhoneNumberId = process.env.ELEVENLABS_PHONE_NUMBER_ID || 'phnum_0101k1tg02tkf5paw24vvbtwrmr2';
+        const agentId = process.env.ELEVENLABS_AGENT_ID || 'agent_4501k2ygkxcmeyks9de5nvz6qye8';
 
-        // Make call via ElevenLabs API with simplified dynamic_variables
+        // Use global phone pool if available, otherwise fallback to single phone
+        const SupabaseDBService = require('./services/supabase-db');
+        const dbService = new SupabaseDBService();
+        const agentPhoneNumberId = await dbService.getRandomPhoneFromPool() ||
+                                  (process.env.ELEVENLABS_PHONE_NUMBER_ID || 'phnum_0101k1tg02tkf5paw24vvbtwrmr2');
+
+        // Lookup contact information for dynamic variables
+        const contactData = await dbService.getContactByPhoneNumber(phoneNumber);
+        const firstName = contactData?.first_name || '';
+        const company = contactData?.company_name || '';
+        const role = contactData?.position || '';
+
+        // Build dynamic variables
+        const agentFirstNameKey = process.env.BATCH_CALLING_FIRST_NAME_KEY || 'name_test';
+        const agentCompanyKey = process.env.BATCH_CALLING_COMPANY_KEY || 'company';
+        const agentRoleKey = process.env.BATCH_CALLING_ROLE_KEY || 'role';
+
+        const dynVars = {};
+        dynVars[agentFirstNameKey] = firstName || '';
+        dynVars.weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date());
+
+        // Add company and role if available
+        if (company) dynVars[agentCompanyKey] = company;
+        if (role) dynVars[agentRoleKey] = role;
+
+        // Make call via ElevenLabs API with enhanced dynamic_variables
         const result = await elevenLabsService.makeOutboundCall(
             agentId,
             agentPhoneNumberId,
             phoneNumber,
             {
                 message: message || 'Hello! This is your AI assistant calling via ElevenLabs.',
-                dynamic_variables: {
-                    name_test: "Martin",
-                    weekday: "Thursday"
-                }
+                dynamic_variables: dynVars
             }
         );
 
@@ -1000,19 +1031,20 @@ app.get('/api/sequences', async (req, res) => {
 // Create new sequence
 app.post('/api/sequences', async (req, res) => {
     try {
-        const { 
-            name, 
-            description, 
-            max_attempts, 
-            retry_delay_hours, 
+        const {
+            name,
+            description,
+            max_attempts,
+            retry_delay_hours,
             is_active,
             timezone,
             business_hours_start,
             business_hours_end,
-            exclude_weekends
+            exclude_weekends,
+            agentConfig // New: agent assignment configuration
         } = req.body;
-        
-        console.log(`➕ Creating new sequence: ${name}`);
+
+        console.log(`➕ Creating new sequence: ${name}${agentConfig ? ' (with agent config)' : ''}`);
         
         // Validate business hours if provided
         if (timezone || business_hours_start || business_hours_end) {
@@ -1046,7 +1078,7 @@ app.post('/api/sequences', async (req, res) => {
             business_hours_start: business_hours_start || '09:00:00',
             business_hours_end: business_hours_end || '17:00:00',
             exclude_weekends: exclude_weekends !== false // Default to true
-        });
+        }, agentConfig);
         
         res.json({
             success: true,
@@ -1254,23 +1286,24 @@ app.get('/api/sequences/:id', async (req, res) => {
     }
 });
 
-// Update sequence
+// Update sequence with optional agent configuration
 app.put('/api/sequences/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { 
-            name, 
-            description, 
-            max_attempts, 
-            retry_delay_hours, 
+        const {
+            name,
+            description,
+            max_attempts,
+            retry_delay_hours,
             is_active,
             timezone,
             business_hours_start,
             business_hours_end,
-            exclude_weekends
+            exclude_weekends,
+            agentConfig // New: agent assignment configuration
         } = req.body;
-        
-        console.log(`✏️ Updating sequence: ${id}`);
+
+        console.log(`✏️ Updating sequence: ${id}${agentConfig ? ' (with agent config)' : ''}`);
         
         // Validate business hours if provided
         if (timezone || business_hours_start || business_hours_end) {
@@ -1304,7 +1337,7 @@ app.put('/api/sequences/:id', async (req, res) => {
             business_hours_start,
             business_hours_end,
             exclude_weekends
-        });
+        }, agentConfig);
         
         res.json({
             success: true,
@@ -1442,22 +1475,35 @@ app.get('/api/sequences/:id/entries', async (req, res) => {
     }
 });
 
-// Add multiple phone numbers to sequence
+// Add multiple phone numbers to sequence with optional agent assignment
 app.post('/api/sequences/:id/entries', async (req, res) => {
     try {
         const { id } = req.params;
-        const { phoneNumberIds } = req.body;
-        
+        const { phoneNumberIds, agentOptions, assignToAll } = req.body;
+
         console.log(`➕ Adding ${phoneNumberIds.length} phone numbers to sequence: ${id}`);
-        
-        const result = await supabaseDb.addPhoneNumbersToSequence(id, phoneNumberIds);
-        
+
+        let result;
+        if (agentOptions && agentOptions.length > 0) {
+            console.log(`🤖 Distributing ${agentOptions.length} agents across entries`);
+            result = await supabaseDb.addPhoneNumbersToSequenceWithAgents(id, phoneNumberIds, agentOptions);
+        } else if (assignToAll && assignToAll.agentId) {
+            // Assign the same agent to all entries
+            console.log(`🤖 Assigning agent ${assignToAll.agentId} to all entries`);
+            const assignments = phoneNumberIds.map(() => assignToAll);
+            result = await supabaseDb.addPhoneNumbersToSequenceWithAgents(id, phoneNumberIds,
+                [{ agentId: assignToAll.agentId, agentPhoneNumberId: assignToAll.agentPhoneNumberId, weight: 1 }]
+            );
+        } else {
+            result = await supabaseDb.addPhoneNumbersToSequence(id, phoneNumberIds);
+        }
+
         res.json({
             success: true,
             result: result,
             message: `Added ${result.added} phone numbers to sequence`
         });
-        
+
     } catch (error) {
         console.error('❌ Error adding phone numbers to sequence:', error.message);
         res.status(500).json({
@@ -1489,6 +1535,93 @@ app.get('/api/phone-numbers/:id/sequences', async (req, res) => {
         res.status(500).json({
             success: false,
             message: `Failed to fetch phone number sequences: ${error.message}`
+        });
+    }
+});
+
+// Get sequence agent metrics for beta testing
+app.get('/api/sequences/:id/agent-metrics', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { from, to } = req.query;
+
+        const filters = {};
+        if (from) filters.from = from;
+        if (to) filters.to = to;
+
+        console.log(`📊 Getting agent metrics for sequence ${id} with filters:`, filters);
+
+        const metrics = await supabaseDb.getSequenceAgentMetrics(id, filters);
+
+        res.json({
+            success: true,
+            sequenceId: id,
+            metrics: metrics,
+            filters: filters
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching sequence agent metrics:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Failed to fetch sequence agent metrics: ${error.message}`
+        });
+    }
+});
+
+// ===== SETTINGS API ENDPOINTS =====
+
+// Get current phone pool configuration
+app.get('/api/settings/phone-pool', async (req, res) => {
+    try {
+        console.log('📱 Getting phone pool configuration from database');
+
+        const phones = await supabaseDb.getPhonePool();
+
+        res.json({
+            success: true,
+            phones,
+            count: phones.length
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching phone pool:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Failed to fetch phone pool: ${error.message}`
+        });
+    }
+});
+
+// Update phone pool configuration (persisted to database)
+app.post('/api/settings/phone-pool', async (req, res) => {
+    try {
+        const { phones } = req.body || {};
+
+        if (!Array.isArray(phones)) {
+            return res.status(400).json({
+                success: false,
+                message: 'phones must be an array'
+            });
+        }
+
+        await supabaseDb.setPhonePool(phones);
+
+        // Get the updated phone pool to return in response
+        const updatedPhones = await supabaseDb.getPhonePool();
+
+        res.json({
+            success: true,
+            phones: updatedPhones,
+            count: updatedPhones.length,
+            message: `Phone pool updated with ${updatedPhones.length} phones`
+        });
+
+    } catch (error) {
+        console.error('❌ Error updating phone pool:', error.message);
+        res.status(500).json({
+            success: false,
+            message: `Failed to update phone pool: ${error.message}`
         });
     }
 });
@@ -1543,7 +1676,7 @@ app.post('/api/contacts/upload-to-sequence', upload.single('csvFile'), async (re
             });
         }
 
-        const { sequenceId } = req.body;
+        const { sequenceId, agentOptions, assignToAll } = req.body;
         if (!sequenceId) {
             return res.status(400).json({
                 success: false,
@@ -1552,16 +1685,37 @@ app.post('/api/contacts/upload-to-sequence', upload.single('csvFile'), async (re
         }
 
         console.log(`📁 Processing file upload to sequence: ${req.file.originalname} -> ${sequenceId}`);
-        
+        if (agentOptions && agentOptions.length > 0) {
+            console.log(`🤖 Will distribute ${agentOptions.length} agents across uploaded contacts`);
+        }
+
         let uploadResult;
-        
+
         if (req.file.originalname.endsWith('.xlsx')) {
-            // Process XLSX file
-            uploadResult = await supabaseDb.processXLSXUploadToSequence(req.file.buffer, sequenceId);
+            // Process XLSX file with optional agent assignment
+            if (agentOptions && agentOptions.length > 0) {
+                uploadResult = await supabaseDb.processXLSXUploadToSequenceWithAgents(req.file.buffer, sequenceId, agentOptions);
+            } else if (assignToAll && assignToAll.agentId) {
+                console.log(`🤖 Will assign agent ${assignToAll.agentId} to all uploaded contacts`);
+                uploadResult = await supabaseDb.processXLSXUploadToSequenceWithAgents(req.file.buffer, sequenceId,
+                    [{ agentId: assignToAll.agentId, agentPhoneNumberId: assignToAll.agentPhoneNumberId, weight: 1 }]
+                );
+            } else {
+                uploadResult = await supabaseDb.processXLSXUploadToSequence(req.file.buffer, sequenceId);
+            }
         } else {
-            // Process CSV file
+            // Process CSV file with optional agent assignment
             const csvContent = req.file.buffer.toString('utf-8');
-            uploadResult = await supabaseDb.processCSVUploadToSequence(csvContent, sequenceId);
+            if (agentOptions && agentOptions.length > 0) {
+                uploadResult = await supabaseDb.processCSVUploadToSequenceWithAgents(csvContent, sequenceId, agentOptions);
+            } else if (assignToAll && assignToAll.agentId) {
+                console.log(`🤖 Will assign agent ${assignToAll.agentId} to all uploaded contacts`);
+                uploadResult = await supabaseDb.processCSVUploadToSequenceWithAgents(csvContent, sequenceId,
+                    [{ agentId: assignToAll.agentId, agentPhoneNumberId: assignToAll.agentPhoneNumberId, weight: 1 }]
+                );
+            } else {
+                uploadResult = await supabaseDb.processCSVUploadToSequence(csvContent, sequenceId);
+            }
         }
         
         res.json({
@@ -1612,7 +1766,27 @@ async function handleSequenceCallCompletion(conversationId, webhookStatus) {
             return;
         }
 
-        // 4) Find or create the call DB row
+        // 4) Extract sequence and agent metadata from ElevenLabs data
+        let sequenceId = null;
+        let sequenceEntryId = null;
+        let agentId = details && details.agent_id;
+
+        // Try to extract from conversation metadata
+        if (details && details.metadata) {
+            // Check for sequence metadata in various possible locations
+            if (details.metadata.conversation_initiation_client_data) {
+                const clientData = details.metadata.conversation_initiation_client_data;
+                sequenceId = clientData.sequence_id || null;
+                sequenceEntryId = clientData.sequence_entry_id || null;
+            }
+            if (details.metadata.source_info) {
+                const sourceInfo = details.metadata.source_info;
+                sequenceId = sequenceId || sourceInfo.sequence_id || null;
+                sequenceEntryId = sequenceEntryId || sourceInfo.sequence_entry_id || null;
+            }
+        }
+
+        // Find or create the call DB row
         let call = await supabaseDb.getCallByConversationId(conversationId);
         if (!call) {
             // If you have details, use the phone number and metadata; otherwise, minimal
@@ -1620,15 +1794,30 @@ async function handleSequenceCallCompletion(conversationId, webhookStatus) {
             const callData = {
                 elevenlabs_conversation_id: conversationId,
                 phone_number: phoneNumber,
-                agent_id: details && details.agent_id,
+                agent_id: agentId,
                 agent_name: details && details.agent_name,
+                sequence_id: sequenceId,
                 created_at: new Date().toISOString()
             };
             call = await supabaseDb.createCall(callData);
-            console.log(`✅ Created minimal call record ${call.id} for ${conversationId}`);
+            console.log(`✅ Created call record ${call.id} for ${conversationId} (sequence: ${sequenceId}, agent: ${agentId})`);
         }
 
-        // 5) Update call with the canonical result and metadata (no ElevenLabs analysis)
+        // 5) Fallback: if sequence_id not found in metadata, try to look it up from database
+        if (!sequenceId && updateData.phone_number && updateData.phone_number !== 'unknown') {
+            try {
+                const sequenceEntry = await supabaseDb.getSequenceEntryByPhoneNumber(updateData.phone_number);
+                if (sequenceEntry && sequenceEntry.sequence_id) {
+                    sequenceId = sequenceEntry.sequence_id;
+                    sequenceEntryId = sequenceEntry.id;
+                    console.log(`🔍 Found sequence ${sequenceId} for phone ${updateData.phone_number} via database lookup`);
+                }
+            } catch (lookupError) {
+                console.warn(`⚠️ Could not lookup sequence for phone ${updateData.phone_number}: ${lookupError.message}`);
+            }
+        }
+
+        // 6) Update call with the canonical result and metadata (no ElevenLabs analysis)
         const updateData = {
             phone_number: details && (details.to_number || details.phone_number) ? (details.to_number || details.phone_number) : call.phone_number || 'unknown',
             start_time: details && details.start_time ? details.start_time : call.start_time || null,
@@ -1637,11 +1826,13 @@ async function handleSequenceCallCompletion(conversationId, webhookStatus) {
             transcript_summary: details && details.transcript_summary ? details.transcript_summary : call.transcript_summary || null,
             call_summary_title: details && details.call_summary_title ? details.call_summary_title : call.call_summary_title || null,
             call_result: call_result,
+            sequence_id: sequenceId || call.sequence_id, // Update sequence_id if found
+            agent_id: agentId || call.agent_id, // Ensure agent_id is set
             updated_at: new Date().toISOString()
         };
         await supabaseDb.updateCall(call.id, updateData);
 
-        // 6) Update sequence entry with your success definition
+        // 7) Update sequence entry with your success definition
         const sequenceEntry = await supabaseDb.getSequenceEntryByPhoneNumber(updateData.phone_number);
         if (!sequenceEntry) {
             console.log(`⚠️ No active sequence entry for ${updateData.phone_number}`);

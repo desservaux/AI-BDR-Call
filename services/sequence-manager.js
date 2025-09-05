@@ -116,10 +116,27 @@ class SequenceManagerService {
 					const firstName = (entry.phone_numbers?.contacts?.first_name || '').trim() || null;
 					const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: tz }).format(new Date());
 
+					// Get company and role from contact data
+					const company = entry.phone_numbers?.contacts?.company_name || '';
+					const role = entry.phone_numbers?.contacts?.position || '';
+
 					// Optional personalized message
 					const personalizedMessage = firstName
 						? `Hi ${firstName}, this is your AI assistant calling via ElevenLabs.`
 						: 'Hello! This is your AI assistant calling via ElevenLabs.';
+
+					// Build dynamic variables with configurable keys
+					const agentFirstNameKey = process.env.BATCH_CALLING_FIRST_NAME_KEY || 'name_test';
+					const agentCompanyKey = process.env.BATCH_CALLING_COMPANY_KEY || 'company';
+					const agentRoleKey = process.env.BATCH_CALLING_ROLE_KEY || 'role';
+
+					const dynVars = {};
+					dynVars[agentFirstNameKey] = firstName || '';
+					dynVars.weekday = weekday;
+
+					// Add company and role if available
+					if (company) dynVars[agentCompanyKey] = company;
+					if (role) dynVars[agentRoleKey] = role;
 
 					const callResult = await elevenLabsService.makeOutboundCall(
 						agentId,
@@ -127,10 +144,7 @@ class SequenceManagerService {
 						phoneNumber,
 						{
 							message: personalizedMessage,
-							dynamic_variables: {
-								name_test: firstName,
-								weekday: weekday
-							},
+							dynamic_variables: dynVars,
 							source_info: { source: 'sequence-batch', sequence_id: entry.sequences.id, sequence_entry_id: entry.id }
 						}
 					);

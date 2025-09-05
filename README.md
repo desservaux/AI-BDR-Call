@@ -33,6 +33,14 @@ ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
 ELEVENLABS_AGENT_ID=your_agent_id_here
 ELEVENLABS_PHONE_NUMBER_ID=your_phone_number_id_here
 
+# Note: Global Phone Number Pool is now configured via the web interface
+# and stored in the database (no longer needs environment variable)
+
+# Dynamic Variables Configuration (for agent personalization)
+BATCH_CALLING_FIRST_NAME_KEY=name_test
+BATCH_CALLING_COMPANY_KEY=company
+BATCH_CALLING_ROLE_KEY=role
+
 # Supabase Configuration (for call logging)
 SUPABASE_URL=your_supabase_url_here
 SUPABASE_ANON_KEY=your_supabase_anon_key_here
@@ -58,6 +66,26 @@ http://localhost:3000
 2. **Click "🎯 Start ElevenLabs Call"**
 3. **Receive the call** from your ElevenLabs agent
 
+### 5. Phone Number Randomization (Optional)
+
+To avoid calling from the same phone number repeatedly (which might trigger spam filters), you can set up a global phone pool:
+
+1. **Via Web Interface** (Recommended):
+   - Go to the web interface at `http://localhost:3000`
+   - Look for settings or configuration section
+   - Configure your phone pool through the UI
+   - The phone pool is now stored in the database and persists across restarts
+
+2. **Legacy Method** (Environment Variable - Deprecated):
+   - The old `ELEVENLABS_PHONE_NUMBER_POOL` environment variable is no longer used
+   - Use the web interface instead for better persistence and management
+```
+
+Each call will randomly select a phone number from this pool. This works for:
+- Manual calls via the web interface
+- Sequence batch calls
+- Agent assignments (when no specific phone is assigned to an agent)
+
 ## 📁 Key Files
 
 - **`index.js`**: Main server with ElevenLabs integration
@@ -81,6 +109,33 @@ The system uses your configured ElevenLabs agent with:
 - **System Prompts**: Defined personality and conversation style
 - **Call Management**: Built-in conversation tracking
 - **Analytics**: Comprehensive call logging and insights
+
+### Dynamic Variables
+
+The system now automatically passes contact information to your ElevenLabs agents through dynamic variables:
+
+- **`name_test`** (configurable): Contact's first name
+- **`company`** (configurable): Contact's company name
+- **`role`** (configurable): Contact's position/role
+- **`weekday`**: Current day of the week
+
+These variables are available in your agent prompts for personalized conversations. You can customize the variable names using:
+
+```bash
+BATCH_CALLING_FIRST_NAME_KEY=your_name_variable
+BATCH_CALLING_COMPANY_KEY=your_company_variable
+BATCH_CALLING_ROLE_KEY=your_role_variable
+```
+
+**Example Agent Prompt:**
+```
+Hello {name_test}! I'm calling from your ElevenLabs assistant. I see you work at {company} as a {role}. How are you today?
+```
+
+The system automatically populates these variables from your contact database for all calling methods:
+- Manual calls via the web interface
+- Batch sequence calls
+- Individual sequence calls
 
 ## 🔧 API Endpoints
 

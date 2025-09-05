@@ -80,6 +80,13 @@ class SequenceBatchCallerService {
         if (this.isTicking) return;
         this.isTicking = true;
         try {
+            // Fail fast if required env vars are missing (avoid claiming entries)
+            const agentIdEnv = process.env.ELEVENLABS_AGENT_ID;
+            const agentPhoneIdEnv = process.env.ELEVENLABS_PHONE_NUMBER_ID;
+            if (!agentIdEnv || !agentPhoneIdEnv) {
+                console.error('Missing ELEVENLABS_AGENT_ID or ELEVENLABS_PHONE_NUMBER_ID; skipping tick');
+                return;
+            }
             let totalJobsSubmitted = 0;
             let loopIndex = 0;
             while (totalJobsSubmitted < this.maxJobsPerTick) {
@@ -109,27 +116,74 @@ class SequenceBatchCallerService {
                     break;
                 }
 
-                // 3) Build recipients array with per-recipient dynamic variables
-                const recipients = claimed
-                    .filter(e => e?.phone_numbers?.phone_number)
-                    .map(e => {
+                // 3) Group entries by assigned agent (or fallback to env)
+                const agentGroups = {};
+                for (const entry of claimed) {
+                    if (!entry?.phone_numbers?.phone_number) continue;
+
+                    // Use assigned agent if present, otherwise use env fallback
+                    const assignedAgentId = entry.assigned_agent_id || agentIdEnv;
+                    let assignedAgentPhoneId = entry.assigned_agent_phone_number_id;
+
+                    // If no phone assigned to agent, try global pool or env fallback
+                    if (!assignedAgentPhoneId) {
+                        assignedAgentPhoneId = await this.db.getRandomPhoneFromPool() || agentPhoneIdEnv;
+                    }
+
+                    if (!assignedAgentId || !assignedAgentPhoneId) {
+                        console.warn(`⚠️ Skipping entry ${entry.id} - no agent assigned and no env fallback`);
+                        continue;
+                    }
+
+                    const groupKey = `${assignedAgentId}:${assignedAgentPhoneId}`;
+                    if (!agentGroups[groupKey]) {
+                        agentGroups[groupKey] = {
+                            agentId: assignedAgentId,
+                            agentPhoneId: assignedAgentPhoneId,
+                            entries: []
+                        };
+                    }
+                    agentGroups[groupKey].entries.push(entry);
+                }
+
+                // 4) Process each agent group
+                const callNameBase = `seq-batch-${new Date().toISOString()}-${loopIndex + 1}`;
+                let jobsSubmittedThisLoop = 0;
+                let anyChunkSucceeded = false;
+
+                for (const [groupKey, group] of Object.entries(agentGroups)) {
+                    if (totalJobsSubmitted >= this.maxJobsPerTick) break;
+
+                    console.log(`🤖 Processing ${group.entries.length} entries for agent ${group.agentId}`);
+
+                    // Build recipients array for this agent group
+                    const recipients = group.entries.map(e => {
                         const tz = e?.sequences?.timezone || 'UTC';
                         const firstName = (e?.phone_numbers?.contacts?.first_name || '').trim() || null;
                         const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: tz }).format(new Date());
 
-                        const clientData = {
-                            sequence_id: e?.sequences?.id,
-                            sequence_entry_id: e?.id
-                        };
+                        const agentFirstNameKey = process.env.BATCH_CALLING_FIRST_NAME_KEY || 'name_test';
+                        const agentCompanyKey = process.env.BATCH_CALLING_COMPANY_KEY || 'company';
+                        const agentRoleKey = process.env.BATCH_CALLING_ROLE_KEY || 'role';
 
                         const dynVars = {};
-                        if (firstName) dynVars.name_test = firstName;
+                        dynVars[agentFirstNameKey] = firstName || '';
                         dynVars.weekday = weekday;
+
+                        // Add company and role from contact data if available
+                        const company = e?.phone_numbers?.contacts?.company_name || '';
+                        const role = e?.phone_numbers?.contacts?.position || '';
+
+                        if (company) dynVars[agentCompanyKey] = company;
+                        if (role) dynVars[agentRoleKey] = role;
 
                         return {
                             phone_number: e.phone_numbers.phone_number,
-                            conversation_initiation_client_data: clientData,
-                            dynamic_variables: dynVars,
+                            conversation_initiation_client_data: {
+                                sequence_id: e?.sequences?.id,
+                                sequence_entry_id: e?.id,
+                                dynamic_variables: dynVars
+                            },
                             source_info: {
                                 source: 'sequence-batch',
                                 sequence_id: e?.sequences?.id,
@@ -138,57 +192,57 @@ class SequenceBatchCallerService {
                         };
                     });
 
-                // 4) Submit in chunks of 50 max
-                const chunks = [];
-                for (let i = 0; i < recipients.length; i += 50) {
-                    chunks.push(recipients.slice(i, i + 50));
-                }
-
-                const agentId = process.env.ELEVENLABS_AGENT_ID;
-                const agentPhoneId = process.env.ELEVENLABS_PHONE_NUMBER_ID;
-                if (!agentId || !agentPhoneId) {
-                    console.error('Missing ELEVENLABS_AGENT_ID or ELEVENLABS_PHONE_NUMBER_ID');
-                    break;
-                }
-
-                let scheduled_time_unix = null;
-                if (this.scheduleOffsetSec > 0) {
-                    scheduled_time_unix = Math.floor((Date.now() + this.scheduleOffsetSec * 1000) / 1000);
-                }
-
-                const callNameBase = `seq-batch-${new Date().toISOString()}-${loopIndex + 1}`;
-                let jobsSubmittedThisLoop = 0;
-
-                for (let c = 0; c < chunks.length; c++) {
-                    if (totalJobsSubmitted >= this.maxJobsPerTick) break;
-                    const chunk = chunks[c];
-                    const call_name = chunks.length === 1 ? callNameBase : `${callNameBase}-${c + 1}`;
-                    const resp = await elevenLabs.submitBatchCalling({
-                        call_name,
-                        agent_id: agentId,
-                        agent_phone_number_id: agentPhoneId,
-                        scheduled_time_unix,
-                        recipients: chunk
-                    });
-                    if (!resp.success) {
-                        console.error('Batch submit error:', resp.error);
-                        continue;
+                    // Submit in chunks of 50 max for this agent
+                    const chunks = [];
+                    for (let i = 0; i < recipients.length; i += 50) {
+                        chunks.push(recipients.slice(i, i + 50));
                     }
-                    totalJobsSubmitted++;
-                    jobsSubmittedThisLoop++;
-                    console.log(`✅ Batch job submitted: ${resp.job?.id} (${chunk.length} recipients)`);
-                }
 
-                if (jobsSubmittedThisLoop > 0) {
-                    // 5) Bump attempt and schedule next_call_time for each claimed entry
-                    for (const entry of claimed) {
-                        try {
-                            await this.db.updateSequenceEntryAfterCall(entry.id, { successful: false });
-                        } catch (e) {
-                            console.warn(`Failed to update entry ${entry.id} after batch submission: ${e.message}`);
+                    // Always schedule for now + offset (avoid null which can be rejected by some orgs)
+                    let scheduled_time_unix = Math.floor(Date.now() / 1000) + this.scheduleOffsetSec;
+
+                    for (let c = 0; c < chunks.length; c++) {
+                        if (totalJobsSubmitted >= this.maxJobsPerTick) break;
+
+                        const chunk = chunks[c];
+                        const call_name = chunks.length === 1
+                            ? `${callNameBase}-${group.agentId}`
+                            : `${callNameBase}-${group.agentId}-${c + 1}`;
+
+                        const resp = await elevenLabs.submitBatchCalling({
+                            call_name,
+                            agent_id: group.agentId,
+                            agent_phone_number_id: group.agentPhoneId,
+                            scheduled_time_unix,
+                            recipients: chunk
+                        });
+
+                        if (!resp.success) {
+                            console.error(`Batch submit error for agent ${group.agentId}:`, resp.error);
+                            continue;
+                        }
+
+                        totalJobsSubmitted++;
+                        jobsSubmittedThisLoop++;
+                        anyChunkSucceeded = true;
+                        console.log(`✅ Batch job submitted for agent ${group.agentId}: ${resp.job?.id} (${chunk.length} recipients)`);
+
+                        // Update attempts/next_call_time only for entries in this successfully submitted chunk
+                        const entryIdsForChunk = chunk
+                            .map(r => r?.conversation_initiation_client_data?.sequence_entry_id)
+                            .filter(id => !!id);
+
+                        for (const entryId of entryIdsForChunk) {
+                            try {
+                                await this.db.updateSequenceEntryAfterCall(entryId, { successful: false });
+                            } catch (e) {
+                                console.warn(`Failed to update entry ${entryId} after batch submission: ${e.message}`);
+                            }
                         }
                     }
-                } else {
+                }
+
+                if (!anyChunkSucceeded) {
                     console.warn('No batch jobs submitted, leaving entries claimed until lock expires');
                     break;
                 }

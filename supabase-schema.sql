@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS events CASCADE;
 DROP TABLE IF EXISTS calls CASCADE;
 DROP TABLE IF EXISTS phone_numbers CASCADE;
 DROP TABLE IF EXISTS contacts CASCADE;
+DROP TABLE IF EXISTS settings CASCADE;
 
 -- Create contacts table for people management
 CREATE TABLE contacts (
@@ -19,6 +20,18 @@ CREATE TABLE contacts (
     position TEXT,
     notes TEXT,
     do_not_call BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create settings table for application configuration
+CREATE TABLE settings (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    setting_key TEXT NOT NULL UNIQUE,
+    setting_value TEXT,
+    setting_type TEXT DEFAULT 'string' CHECK (setting_type IN ('string', 'number', 'boolean', 'json')),
+    description TEXT,
+    is_system BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -128,6 +141,8 @@ CREATE TABLE sequences (
     business_hours_start TIME DEFAULT '09:00:00',
     business_hours_end TIME DEFAULT '17:00:00',
     exclude_weekends BOOLEAN DEFAULT TRUE,
+    -- Agent assignment configuration for beta testing
+    agent_assignment_config JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -140,6 +155,10 @@ CREATE TABLE sequence_entries (
     current_attempt INTEGER DEFAULT 0,
     next_call_time TIMESTAMP WITH TIME ZONE,
     status TEXT DEFAULT 'active' CHECK (status IN ('active', 'completed', 'stopped', 'max_attempts_reached')),
+    -- Agent assignment for beta testing
+    assigned_agent_id TEXT,
+    assigned_agent_phone_number_id TEXT,
+    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(sequence_id, phone_number_id)
@@ -149,6 +168,9 @@ CREATE TABLE sequence_entries (
 CREATE INDEX idx_contacts_email ON contacts(email);
 CREATE INDEX idx_contacts_company ON contacts(company_name);
 CREATE INDEX idx_contacts_do_not_call ON contacts(do_not_call);
+
+CREATE INDEX idx_settings_key ON settings(setting_key);
+CREATE INDEX idx_settings_system ON settings(is_system);
 
 CREATE INDEX idx_phone_numbers_contact_id ON phone_numbers(contact_id);
 CREATE INDEX idx_phone_numbers_phone_number ON phone_numbers(phone_number);
@@ -186,6 +208,7 @@ CREATE INDEX idx_sequences_exclude_weekends ON sequences(exclude_weekends);
 CREATE INDEX idx_sequence_entries_sequence_id ON sequence_entries(sequence_id);
 CREATE INDEX idx_sequence_entries_phone_number_id ON sequence_entries(phone_number_id);
 CREATE INDEX idx_sequence_entries_status ON sequence_entries(status);
+CREATE INDEX idx_sequence_entries_assigned_agent_id ON sequence_entries(assigned_agent_id);
 CREATE INDEX idx_sequence_entries_next_call_time ON sequence_entries(next_call_time);
 
 -- Create a function to update the updated_at timestamp
@@ -199,6 +222,9 @@ $$ language 'plpgsql';
 
 -- Create triggers to automatically update updated_at
 CREATE TRIGGER update_contacts_updated_at BEFORE UPDATE ON contacts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_phone_numbers_updated_at BEFORE UPDATE ON phone_numbers
@@ -300,15 +326,15 @@ GROUP BY co.id, co.first_name, co.last_name, co.email, co.company_name, co.posit
 -- GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
 -- Display table structure
-SELECT 
+SELECT
     table_name,
     column_name,
     data_type,
     is_nullable,
     column_default
-FROM information_schema.columns 
-WHERE table_schema = 'public' 
-AND table_name IN ('contacts', 'phone_numbers', 'calls', 'transcriptions', 'events', 'booking_analysis', 'sequences', 'sequence_entries')
+FROM information_schema.columns
+WHERE table_schema = 'public'
+AND table_name IN ('contacts', 'settings', 'phone_numbers', 'calls', 'transcriptions', 'events', 'booking_analysis', 'sequences', 'sequence_entries')
 ORDER BY table_name, ordinal_position;
 
 alter table public.sequence_entries

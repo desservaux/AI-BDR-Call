@@ -138,6 +138,7 @@ class ElevenLabsService {
                 }
                 if (r.user_id) base.user_id = r.user_id;
                 if (r.source_info) base.source_info = r.source_info;
+                // Support both nested (in client_data) and root-level dynamic_variables for backward compatibility
                 if (r.dynamic_variables) base.dynamic_variables = r.dynamic_variables;
                 return base;
             });

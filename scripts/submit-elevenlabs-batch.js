@@ -70,9 +70,19 @@ function postJson(url, payload, headers = {}) {
 			recipients: [
 				{
 					phone_number: '+33643584946',
-					dynamic_variables: {
-						name_test: 'Martin',
-						weekday: 'Monday'
+					conversation_initiation_client_data: {
+						source: 'manual-script',
+						request_id: callName,
+						dynamic_variables: {
+							name_test: 'Martin',
+							weekday: 'Monday',
+							company: 'Test Company',
+							role: 'Test Manager'
+						}
+					},
+					source_info: {
+						source: 'manual-batch-script',
+						test_run: true
 					}
 				}
 			]
@@ -83,6 +93,8 @@ function postJson(url, payload, headers = {}) {
 		console.log('API Key:', apiKey ? `${apiKey.substring(0, 10)}...` : 'NOT SET');
 		console.log('Agent ID:', agentId);
 		console.log('Phone Number ID:', agentPhoneNumberId);
+		console.log('Raw HTTP Body that will be sent:');
+		console.log(JSON.stringify(payload));
 		
 		try {
 			const response = await postJson(
