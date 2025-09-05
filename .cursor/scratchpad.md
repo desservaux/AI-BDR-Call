@@ -230,6 +230,17 @@ Verification:
 - [x] Backend: Fallback when `agent_assignment_config` column missing (graceful degrade)
 - [ ] Ops: Apply `migration-sequence-beta-testing.sql` to add the missing column
 
+### Voicemail Detection Implementation
+
+- [x] Parse voicemail detection in `services/elevenlabs.js` → `getConversationDetailsEnhanced`
+- [x] Prevent successful call cleanup for voicemail in `services/call-sync.js` → `processDetailedConversation`
+- [x] Update webhook success logic in `index.js` → `handleSequenceCallCompletion`
+- [x] Add optional database columns `voicemail_detected` and `voicemail_reason` to calls table
+- [x] Create migration file `migration-voicemail-detection.sql`
+- [x] Test implementation with mock voicemail detection tool calls
+- [x] Update call list UI to show "Voicemail" status when voicemail_detected is true
+- [x] Add CSS styling for voicemail status badge (gray background)
+
 ### Lessons (Addendum)
 
 - When adding optional JSON config columns, guard server writes with fallbacks so core flows work even if migrations are pending.

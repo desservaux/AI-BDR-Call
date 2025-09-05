@@ -759,7 +759,12 @@
             background: #fff3cd;
             color: #856404;
         }
-        
+
+        .status-voicemail {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
         .status-in-progress {
             background: #fff3cd;
             color: #856404;
@@ -3842,6 +3847,7 @@
         function getStatusClass(result) {
             switch(result) {
                 case 'answered': return 'status-answered';
+                case 'voicemail': return 'status-voicemail';
                 case 'failed': return 'status-failed';
                 case 'unanswered': return 'status-unanswered';
                 default: return 'status-in-progress';
@@ -3851,6 +3857,7 @@
         function getStatusText(result) {
             switch(result) {
                 case 'answered': return 'Answered';
+                case 'voicemail': return 'Voicemail';
                 case 'failed': return 'Failed';
                 case 'unanswered': return 'Unanswered';
                 default: return 'In Progress';
@@ -5107,25 +5114,44 @@ Bob,Johnson,bob@bigcompany.com,Big Company,CEO,+1555123456,work,true,false,High 
         // Load sequence details
         async function loadSequenceDetails(sequenceId) {
             try {
-                const [sequenceResponse, entriesResponse] = await Promise.all([
+                const [sequenceResponse, entriesResponse, statsResponse] = await Promise.all([
                     fetch(`${API_BASE}/api/sequences/${sequenceId}`),
-                    fetch(`${API_BASE}/api/sequences/${sequenceId}/entries`)
+                    fetch(`${API_BASE}/api/sequences/${sequenceId}/entries`),
+                    fetch(`${API_BASE}/api/sequences/${sequenceId}/statistics`)
                 ]);
 
                 const sequenceData = await sequenceResponse.json();
                 const entriesData = await entriesResponse.json();
+                const statsData = await statsResponse.json();
 
                 if (sequenceData.success && entriesData.success) {
                     const sequence = sequenceData.sequence;
                     const entries = entriesData.entries;
 
-                    // Update stats
-                    document.getElementById('sequenceTotalEntries').textContent = entries.length;
-                    document.getElementById('sequenceActiveEntries').textContent = entries.filter(e => e.status === 'active').length;
-                    document.getElementById('sequenceCompletedEntries').textContent = entries.filter(e => e.status === 'completed').length;
-                    document.getElementById('sequenceMaxAttempts').textContent = sequence.max_attempts;
+                    // Prefer full statistics for counts (not affected by pagination)
+                    let totalEntries = entries.length;
+                    let activeEntries = entries.filter(e => e.status === 'active').length;
+                    let completedEntries = entries.filter(e => e.status === 'completed').length;
 
-                    // Update entries table
+                    if (statsData && statsData.success && statsData.statistics) {
+                        totalEntries = statsData.statistics.total_entries ?? totalEntries;
+                        activeEntries = statsData.statistics.active_entries ?? activeEntries;
+                        completedEntries = statsData.statistics.completed_entries ?? completedEntries;
+                    }
+
+                    // Scope DOM updates to the details modal to avoid duplicate ID conflicts
+                    const modalRoot = document.getElementById('sequenceDetailsModal');
+                    const totalEl = modalRoot && modalRoot.querySelector('#sequenceTotalEntries');
+                    const activeEl = modalRoot && modalRoot.querySelector('#sequenceActiveEntries');
+                    const completedEl = modalRoot && modalRoot.querySelector('#sequenceCompletedEntries');
+                    const maxAttemptsEl = modalRoot && modalRoot.querySelector('#sequenceMaxAttempts');
+
+                    if (totalEl) totalEl.textContent = totalEntries;
+                    if (activeEl) activeEl.textContent = activeEntries;
+                    if (completedEl) completedEl.textContent = completedEntries;
+                    if (maxAttemptsEl) maxAttemptsEl.textContent = sequence.max_attempts;
+
+                    // Update entries table (may be paginated)
                     displaySequenceEntries(entries);
                 }
             } catch (error) {

@@ -312,6 +312,29 @@ class ElevenLabsService {
             const response = await this.client.get(`/convai/conversations/${conversationId}`);
             
             // Extract data from documented ElevenLabs API fields
+            // Extract voicemail detection tool call
+            let voicemailDetected = false;
+            let voicemailReason = null;
+            try {
+                const msgs = response.data.messages || [];
+                const vm = msgs.find(m => m?.type === 'function' && m?.function?.name === 'voicemail_detection');
+                if (vm) {
+                    voicemailDetected = true;
+                    // Try to parse the reason from the function arguments JSON
+                    const args = vm.function?.arguments;
+                    if (args) {
+                        try {
+                            const parsed = JSON.parse(args);
+                            voicemailReason = parsed?.reason || null;
+                        } catch (_) {
+                            voicemailReason = args; // keep raw if not JSON
+                        }
+                    }
+                }
+            } catch (_) {
+                // Ignore parsing errors
+            }
+
             const conversationData = {
                 success: true,
                 conversation_id: conversationId,
@@ -319,40 +342,42 @@ class ElevenLabsService {
                 agent_name: response.data.agent_name,
                 phone_number_id: response.data.phone_number_id,
                 phone_number: response.data.phone_number,
-                
+
                 // Extract to_number from best available documented location
-                to_number: response.data.metadata?.phone_call?.external_number || 
-                          response.data.metadata?.external_number || 
-                          response.data.external_number || 
+                to_number: response.data.metadata?.phone_call?.external_number ||
+                          response.data.metadata?.external_number ||
+                          response.data.external_number ||
                           response.data.to_number || null,
-                
-                agent_number: response.data.agent_number || 
-                             response.data.metadata?.phone_call?.agent_number || 
+
+                agent_number: response.data.agent_number ||
+                             response.data.metadata?.phone_call?.agent_number ||
                              response.data.metadata?.agent_number,
-                
+
                 // Extract start_time from documented field: metadata.start_time_unix_secs → ISO
-                start_time: response.data.metadata?.start_time_unix_secs ? 
+                start_time: response.data.metadata?.start_time_unix_secs ?
                            new Date(response.data.metadata.start_time_unix_secs * 1000).toISOString() : null,
-                
+
                 end_time: response.data.end_time,
-                
+
                 // Extract duration from documented field: metadata.call_duration_secs
                 duration: response.data.metadata?.call_duration_secs || response.data.duration || 0,
-                
+
                 // Extract status_raw from documented field: response.data.status
                 status_raw: response.data.status,
-                
+
                 // Extract message_count from documented field: response.data.message_count || transcript.length || 0
-                message_count: response.data.message_count || 
-                              (response.data.transcript ? response.data.transcript.length : 0) || 
+                message_count: response.data.message_count ||
+                              (response.data.transcript ? response.data.transcript.length : 0) ||
                               (response.data.messages ? response.data.messages.length : 0) || 0,
-                
+
                 // Extract documented fields
                 transcript_summary: response.data.transcript_summary,
                 call_summary_title: response.data.call_summary_title,
-                
+
                 messages: response.data.messages || [],
-                metadata: response.data.metadata || {}
+                metadata: response.data.metadata || {},
+                voicemail_detected: voicemailDetected,
+                voicemail_reason: voicemailReason
             };
             
             // Extract transcript from documented field: response.data.transcript (fallback to messages synthesized if needed)
@@ -377,7 +402,7 @@ class ElevenLabsService {
                     conversationData.transcript = [];
                 }
             }
-            
+
             console.log(`✅ Enhanced conversation details retrieved successfully`);
             console.log(`📊 Call duration: ${conversationData.duration}s, Messages: ${conversationData.message_count}`);
             console.log(`📞 Phone number: ${conversationData.to_number}, Agent number: ${conversationData.agent_number}`);
@@ -385,7 +410,7 @@ class ElevenLabsService {
             console.log(`🔍 Raw response fields: ${Object.keys(response.data).join(', ')}`);
             console.log(`🔍 Metadata fields: ${Object.keys(response.data.metadata || {}).join(', ')}`);
             console.log(`🔍 Phone call data: ${JSON.stringify(response.data.metadata?.phone_call)}`);
-            
+
             return conversationData;
         } catch (error) {
             console.error('❌ Error getting enhanced conversation details:', error.response?.data || error.message);

@@ -280,7 +280,9 @@ class CallSyncService {
                 transcript: conversationData.transcript,
                 transcript_summary: conversationData.transcript_summary,
                 call_summary_title: conversationData.call_summary_title,
-                call_result: call_result // Add the computed result
+                call_result: call_result, // Add the computed result
+                voicemail_detected: conversationData.voicemail_detected || false,
+                voicemail_reason: conversationData.voicemail_reason || null
             };
             
             // Update call with consolidated data
@@ -293,6 +295,8 @@ class CallSyncService {
                 transcript_summary: consolidatedData.transcript_summary,
                 call_summary_title: consolidatedData.call_summary_title,
                 call_result: call_result, // Only write call_result, not status or answered
+                voicemail_detected: consolidatedData.voicemail_detected,
+                voicemail_reason: consolidatedData.voicemail_reason,
                 updated_at: new Date().toISOString()
             };
             
@@ -356,15 +360,20 @@ class CallSyncService {
                 console.log(`⏭️ Skipping Gemini analysis for call ${callId}: ${this.getSkipReason(consolidatedData)} or service not initialized`);
             }
 
-            // PHASE 23: Duration-based cleanup trigger
+            // PHASE 23: Duration-based cleanup trigger (only for human-answered, non-voicemail calls)
             const DURATION_THRESHOLD_SECONDS = 7;
-            if (consolidatedData.duration && consolidatedData.duration > DURATION_THRESHOLD_SECONDS) {
-                console.log(`✅ Call duration (${consolidatedData.duration}s) exceeded threshold. Triggering sequence cleanup for ${consolidatedData.to_number}.`);
+            const humanAnswered = consolidatedData.call_result === 'answered';
+            const notVoicemail = !consolidatedData.voicemail_detected;
+
+            if (humanAnswered && notVoicemail && consolidatedData.duration > DURATION_THRESHOLD_SECONDS) {
+                console.log(`✅ Human connect. Triggering sequence cleanup for ${consolidatedData.to_number}.`);
                 try {
                     await this.sequenceManager.handleSuccessfulCall(consolidatedData.to_number);
                 } catch (cleanupError) {
                     console.warn(`⚠️ Sequence cleanup failed for ${consolidatedData.to_number}:`, cleanupError.message);
                 }
+            } else if (consolidatedData.voicemail_detected) {
+                console.log(`📼 Voicemail detected for ${consolidatedData.to_number}. Keeping in sequence (no DNC/completion).`);
             }
         } catch (error) {
             console.error(`❌ Error processing detailed conversation ${conversationId}:`, error.message);

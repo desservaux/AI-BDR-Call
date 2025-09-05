@@ -217,7 +217,11 @@ app.post('/webhook/elevenlabs-call-ended', async (req, res) => {
 
 // Helper function to map call status based on call data
 function mapCallStatus(call) {
-    // Since we're computing call_result in the backend, just use it directly
+    // Check for voicemail detection first
+    if (call.voicemail_detected) {
+        return 'voicemail';
+    }
+    // Otherwise use the computed call_result
     return call.call_result || call.status || 'unknown';
 }
 
@@ -1766,6 +1770,9 @@ async function handleSequenceCallCompletion(conversationId, webhookStatus) {
             return;
         }
 
+        // 3.5) Check for voicemail detection
+        const voicemailDetected = !!(details && details.voicemail_detected);
+
         // 4) Extract sequence and agent metadata from ElevenLabs data
         let sequenceId = null;
         let sequenceEntryId = null;
@@ -1826,6 +1833,8 @@ async function handleSequenceCallCompletion(conversationId, webhookStatus) {
             transcript_summary: details && details.transcript_summary ? details.transcript_summary : call.transcript_summary || null,
             call_summary_title: details && details.call_summary_title ? details.call_summary_title : call.call_summary_title || null,
             call_result: call_result,
+            voicemail_detected: voicemailDetected,
+            voicemail_reason: details?.voicemail_reason || null,
             sequence_id: sequenceId || call.sequence_id, // Update sequence_id if found
             agent_id: agentId || call.agent_id, // Ensure agent_id is set
             updated_at: new Date().toISOString()
@@ -1839,18 +1848,22 @@ async function handleSequenceCallCompletion(conversationId, webhookStatus) {
             return;
         }
 
-        const successful = (call_result === 'answered');
+        const successful = (call_result === 'answered') && !voicemailDetected;
         if (successful) {
-            // Mark the sequence entry as completed on confirmed answered outcome
+            // Mark the sequence entry as completed on confirmed answered outcome (non-voicemail)
             await supabaseDb.updateSequenceEntry(sequenceEntry.id, {
                 status: 'completed',
                 next_call_time: null,
                 updated_at: new Date().toISOString()
             });
-            console.log(`✅ Sequence entry completed for ${conversationId} (answered)`);
+            console.log(`✅ Sequence entry completed for ${conversationId} (answered, no voicemail)`);
         } else {
             // Do not modify attempts/schedule here; the caller already scheduled next attempt
-            console.log(`↩️ Sequence entry left active for ${conversationId} (result=${call_result}); next attempt already scheduled`);
+            if (voicemailDetected) {
+                console.log(`📼 Voicemail detected for ${conversationId}. Keeping sequence entry active (no completion).`);
+            } else {
+                console.log(`↩️ Sequence entry left active for ${conversationId} (result=${call_result}); next attempt already scheduled`);
+            }
         }
     } catch (error) {
         console.error('❌ Error handling sequence call completion:', error.message);
